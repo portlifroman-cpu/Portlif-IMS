@@ -13,3 +13,6 @@ Portlif Grupp OÜ CRM + ISO Integrated Management System.
 - Риски, инциденты, CAPA, аудиты
 - Документы
 - Оборудование
+
+
+Deployment trigger: 2026-10-01
