@@ -1,24 +1,10 @@
 {
   "version": 2,
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "headers": [
+  "redirects": [
     {
       "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "same-origin"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "no-store"
-        }
-      ]
+      "destination": "https://fsagcbmysufzfneywrlp.supabase.co/functions/v1/portlif-ims",
+      "permanent": false
     }
   ]
 }
