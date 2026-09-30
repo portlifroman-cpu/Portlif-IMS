@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Portlif IMS — вход</title>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f3f6f7;color:#17323b}
+.wrap{min-height:100vh;display:grid;place-items:center;padding:20px}.card{width:min(460px,100%);background:#fff;border:1px solid #dbe5e9;border-radius:20px;padding:26px}
+h1{margin:0 0 8px;color:#0f6573}.muted{color:#718188;margin-bottom:18px}.field{width:100%;padding:12px;border:1px solid #dbe5e9;border-radius:10px;margin-top:6px}
+label{display:block;margin-top:12px;font-size:13px;font-weight:700}.btn{width:100%;padding:13px;border:0;border-radius:11px;background:#0f6573;color:#fff;font-weight:800;margin-top:16px}.msg{margin-top:14px;font-size:14px;line-height:1.4}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+<h1>PORTLIF IMS</h1>
+<div class="muted">Вход владельца без пароля</div>
+<label>Email</label>
+<input class="field" value="roman@portlif.ee" readonly>
+<button class="btn" id="send">Отправить ссылку для входа</button>
+<div class="msg" id="msg"></div>
+</div></div>
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+const msg=document.getElementById("msg");
+const cfg=await fetch("https://fsagcbmysufzfneywrlp.supabase.co/functions/v1/portlif-config").then(r=>r.json());
+const db=createClient(cfg.url,cfg.key);
+document.getElementById("send").onclick=async()=>{
+  msg.textContent="Отправляю письмо…";
+  const {error}=await db.auth.signInWithOtp({
+    email:"roman@portlif.ee",
+    options:{emailRedirectTo:"https://portlif-ims.vercel.app",shouldCreateUser:true}
+  });
+  msg.textContent=error ? "Ошибка: "+error.message : "Ссылка отправлена на roman@portlif.ee. Откройте письмо и нажмите ссылку.";
+};
+</script>
+</body>
+</html>
