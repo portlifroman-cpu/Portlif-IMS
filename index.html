@@ -266,15 +266,16 @@ window.saveDoc=async()=>{const row={title:$("dTitle").value.trim(),document_type
 async function loadWarehouse(){
   const [
     {data:locs=[]},{data:stock=[]},{data:movs=[]},{data:lots=[]},{data:codes=[]},
-    {data:tankRows=[]},{data:outEvents=[]}
+    {data:tankRecent=[]},{data:streetEvents=[]},{data:processRecent=[]}
   ] = await Promise.all([
     db.from("portlif_warehouse_locations").select("*").eq("active",true).order("code"),
     db.from("portlif_waste_inventory").select("*,portlif_warehouse_locations(code,name),portlif_lots(lot_no),portlif_waste_codes(ewc_code,description)").order("created_at",{ascending:false}),
     db.from("portlif_waste_movements").select("*,portlif_waste_inventory(description,container_ref,location_id)").order("movement_at",{ascending:false}).limit(200),
     db.from("portlif_lots").select("id,lot_no,product_name,status").neq("status","closed").order("created_at",{ascending:false}),
     db.from("portlif_waste_codes").select("id,ewc_code,description").order("ewc_code"),
-    db.from("portlif_tank_daily").select("*,portlif_warehouse_locations(code,name,capacity_m3,location_type)").order("record_date",{ascending:false}).limit(100),
-    db.from("portlif_tank_events").select("*,portlif_warehouse_locations(code,name,capacity_m3)").order("event_date",{ascending:false}).order("source_row",{ascending:false}).limit(100)
+    db.from("portlif_tank_daily").select("*,portlif_warehouse_locations(code,name,capacity_m3)").order("record_date",{ascending:false}).limit(350),
+    db.from("portlif_tank_events").select("*,portlif_warehouse_locations(code,name,capacity_m3)").order("event_date",{ascending:false}).limit(200),
+    db.from("portlif_process_daily").select("*").order("record_date",{ascending:false}).limit(300)
   ]);
 
   const total=stock.reduce((s,x)=>s+Number(x.quantity_t||0),0);
@@ -284,47 +285,51 @@ async function loadWarehouse(){
   $("whLots").textContent=new Set(stock.map(x=>x.lot_id).filter(Boolean)).size;
   $("whQuarantine").textContent=quarantine.toLocaleString("ru-RU",{maximumFractionDigits:3});
 
-  const latestDate=tankRows.length?tankRows[0].record_date:null;
-  const latestRows=latestDate?tankRows.filter(x=>x.record_date===latestDate):[];
-  const latestMoveCount=latestRows.filter(x=>Number(x.input_m3||0)||Number(x.output_m3||0)||Number(x.shipment_m3||0)).length;
-  $("whTankMoves").textContent=latestMoveCount;
+  const latestByCode={};
+  tankRecent.forEach(r=>{
+    const code=r.portlif_warehouse_locations?.code;
+    if(code && !latestByCode[code]) latestByCode[code]=r;
+  });
 
-  const latestByLoc=new Map();
-  tankRows.forEach(x=>{if(!latestByLoc.has(x.location_id))latestByLoc.set(x.location_id,x)});
-  const lastEventByLoc=new Map();
-  outEvents.forEach(x=>{if(!lastEventByLoc.has(x.location_id))lastEventByLoc.set(x.location_id,x)});
+  const tankCodes=["M1","M2","M3","M4","M5","M6","M7"];
+  const latestRows=tankCodes.map(x=>latestByCode[x]).filter(Boolean);
+  const latestDate=latestRows.length?latestRows.map(x=>x.record_date).sort().reverse()[0]:null;
+  $("whTankMoves").textContent=latestDate?new Date(latestDate+"T00:00:00").toLocaleDateString("ru-RU"):"—";
+  const whTankMoveSub=document.querySelector("#whTankMoves + .muted");
+  if(whTankMoveSub) whTankMoveSub.textContent="последние данные Excel";
 
-  const vesselLocs=locs.filter(x=>["tank","container"].includes(x.location_type));
-  $("tankMovementCards").innerHTML=vesselLocs.length?vesselLocs.map(loc=>{
-    const row=latestByLoc.get(loc.id);
-    const ev=lastEventByLoc.get(loc.id);
-    const cap=Number(loc.capacity_m3||0);
-    if(row){
-      const qty=Number(row.balance_m3||0);
-      const pct=cap>0?Math.max(0,Math.min(100,qty/cap*100)):0;
-      const free=cap>0?Math.max(0,cap-qty):null;
-      return '<div class="tankcard">'+
-        '<div class="tankhead"><div><b>'+esc(loc.name)+'</b><div class="muted" style="font-size:12px">Данные '+esc(row.record_date)+'</div></div><span class="tankcode">'+esc(loc.code)+'</span></div>'+
-        '<div class="tankqty">'+qty.toLocaleString("ru-RU",{maximumFractionDigits:3})+' м³</div>'+
-        '<div class="muted" style="font-size:12px">Вместимость '+(cap?cap.toLocaleString("ru-RU")+" м³":"—")+'</div>'+
-        '<div class="tankbar"><div class="tankfill" style="width:'+pct.toFixed(1)+'%"></div></div>'+
-        '<div class="tankmeta">'+
-          '<div>Заполнено<br><b>'+pct.toFixed(1)+'%</b></div>'+
-          '<div>Свободно<br><b>'+(free==null?"—":free.toLocaleString("ru-RU",{maximumFractionDigits:3})+" м³")+'</b></div>'+
-          '<div>Вход<br><b>'+Number(row.input_m3||0).toLocaleString("ru-RU",{maximumFractionDigits:3})+' м³</b></div>'+
-          '<div>Выход<br><b>'+Number(row.output_m3||0).toLocaleString("ru-RU",{maximumFractionDigits:3})+' м³</b></div>'+
-          '<div>Отгрузка<br><b>'+Number(row.shipment_m3||0).toLocaleString("ru-RU",{maximumFractionDigits:3})+' м³</b></div>'+
-        '</div>'+
-        (row.notes?'<div class="muted" style="font-size:12px;margin-top:10px;white-space:pre-wrap">'+esc(row.notes)+'</div>':'')+
-      '</div>';
-    }
-    return '<div class="tankcard">'+
-      '<div class="tankhead"><div><b>'+esc(loc.name)+'</b><div class="muted" style="font-size:12px">Уличная ёмкость</div></div><span class="tankcode">'+esc(loc.code)+'</span></div>'+
-      '<div class="tankqty">'+(cap?cap.toLocaleString("ru-RU")+" м³":"—")+'</div>'+
-      '<div class="muted" style="font-size:12px">Вместимость</div>'+
-      (ev?'<div style="margin-top:12px"><b>Последнее событие: '+esc(ev.event_date||ev.source_date_text||"—")+'</b><div class="muted" style="font-size:12px;margin-top:5px;white-space:pre-wrap">'+esc(ev.description||"")+'</div></div>':'<div class="muted" style="margin-top:12px">История пока не указана</div>')+
-    '</div>';
-  }).join(""):'<div class="empty">Ёмкости ещё не заведены.</div>';
+  const vesselLocs=locs.filter(x=>tankCodes.includes(x.code));
+  $("tankMovementCards").innerHTML=vesselLocs.map(loc=>{
+    const r=latestByCode[loc.code];
+    const qty=r?.balance_m3==null?null:Number(r.balance_m3);
+    const cap=Number(loc.capacity_m3||200);
+    const pct=qty==null||!cap?null:Math.max(0,Math.min(100,qty/cap*100));
+    const input=r?.input_m3==null?0:Number(r.input_m3);
+    const output=r?.output_m3==null?0:Number(r.output_m3);
+    const shipment=r?.shipment_m3==null?0:Number(r.shipment_m3);
+    return '<div class="tankcard"><div class="tankhead"><div><b>'+esc(loc.name)+'</b><div class="muted" style="font-size:12px">'+(r?new Date(r.record_date+"T00:00:00").toLocaleDateString("ru-RU"):"Нет данных")+'</div></div><span class="tankcode">'+esc(loc.code)+'</span></div>'+
+      '<div class="tankqty">'+(qty==null?"—":qty.toLocaleString("ru-RU",{maximumFractionDigits:3})+" м³")+'</div>'+
+      '<div class="muted" style="font-size:12px">Вместимость '+cap.toLocaleString("ru-RU")+' м³</div>'+
+      '<div class="tankbar"><div class="tankfill" style="width:'+(pct??0).toFixed(1)+'%"></div></div>'+
+      '<div class="tankmeta"><div>Заполнено<br><b>'+(pct==null?"—":pct.toFixed(1)+"%")+'</b></div><div>Свободно<br><b>'+(qty==null?"—":Math.max(0,cap-qty).toLocaleString("ru-RU",{maximumFractionDigits:3})+" м³")+'</b></div><div>Вход<br><b>'+input.toLocaleString("ru-RU",{maximumFractionDigits:3})+' м³</b></div><div>Выход<br><b>'+output.toLocaleString("ru-RU",{maximumFractionDigits:3})+' м³</b></div><div>Отгрузка<br><b>'+shipment.toLocaleString("ru-RU",{maximumFractionDigits:3})+' м³</b></div></div>'+
+      (r?.notes?'<div class="muted" style="font-size:12px;margin-top:10px">'+esc(r.notes)+'</div>':'')+'</div>';
+  }).join("");
+
+  window._tankHistory=tankRecent;
+  await loadTankHistory();
+
+  $("streetTankTable").innerHTML=table(["Дата","Ёмкость","Количество, м³","Тип","Примечание"],streetEvents.map(x=>[
+    x.event_date?new Date(x.event_date+"T00:00:00").toLocaleDateString("ru-RU"):esc(x.source_date_text||"—"),
+    esc(x.portlif_warehouse_locations?.code||"—"),
+    x.quantity_m3==null?"—":Number(x.quantity_m3).toLocaleString("ru-RU",{maximumFractionDigits:3}),
+    esc(x.event_type||"—"),
+    esc(x.description||"—")
+  ]));
+
+  $("processHistoryTable").innerHTML=table(["Дата","Дистилляция","Трикантер","Пиролиз","Вывоз воды","Примечание"],processRecent.map(x=>[
+    new Date(x.record_date+"T00:00:00").toLocaleDateString("ru-RU"),
+    esc(x.distillation||"—"),esc(x.tricanter||"—"),esc(x.pyrolysis||"—"),esc(x.water_export||"—"),esc(x.notes||"—")
+  ]));
 
   $("whLocationsTable").innerHTML=table(["Код","Название","Тип","Вместимость, м³","Статус"],locs.map(x=>[
     esc(x.code),esc(x.name),esc(x.location_type),x.capacity_m3??"—",x.active?"Активно":"Отключено"
@@ -341,55 +346,30 @@ async function loadWarehouse(){
   ]));
 
   $("whMovementsTable").innerHTML=table(["Дата","Тип","Количество, т","Описание","Документ"],movs.map(x=>[
-    new Date(x.movement_at).toLocaleString("ru-RU"),
-    esc(x.movement_type),
+    new Date(x.movement_at).toLocaleString("ru-RU"),esc(x.movement_type),
     Number(x.quantity_t||0).toLocaleString("ru-RU",{maximumFractionDigits:3}),
-    esc(x.portlif_waste_inventory?.description||x.portlif_waste_inventory?.container_ref||"—"),
-    esc(x.document_no||"—")
+    esc(x.portlif_waste_inventory?.description||x.portlif_waste_inventory?.container_ref||"—"),esc(x.document_no||"—")
   ]));
 
-  $("outdoorTankEvents").innerHTML=table(["Дата","Ёмкость","Тип","Количество, м³","Описание"],outEvents.map(x=>[
-    esc(x.event_date||x.source_date_text||"—"),
-    esc(x.portlif_warehouse_locations?.name||x.portlif_warehouse_locations?.code||"—"),
-    esc(x.event_type||"—"),
-    x.quantity_m3==null?"—":Number(x.quantity_m3).toLocaleString("ru-RU",{maximumFractionDigits:3}),
-    esc(x.description||"—")
-  ]));
-
-  $("whStockLocation").innerHTML=locs.length
-    ? locs.map(x=>'<option value="'+x.id+'">'+esc(x.code+" · "+x.name)+'</option>').join("")
-    : '<option value="">Сначала добавьте место хранения</option>';
+  $("whStockLocation").innerHTML=locs.length?locs.map(x=>'<option value="'+x.id+'">'+esc(x.code+" · "+x.name)+'</option>').join(""):'<option value="">Сначала добавьте место хранения</option>';
   $("whStockLot").innerHTML='<option value="">Без привязки</option>'+lots.map(x=>'<option value="'+x.id+'">'+esc(x.lot_no+" · "+(x.product_name||""))+'</option>').join("");
   $("whStockWasteCode").innerHTML='<option value="">Не указан</option>'+codes.map(x=>'<option value="'+x.id+'">'+esc(x.ewc_code+" · "+x.description)+'</option>').join("");
-
-  const internalLocs=locs.filter(x=>/^M[1-7]$/.test(x.code));
-  $("tankHistoryTank").innerHTML='<option value="">Все ёмкости</option>'+internalLocs.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join("");
-  if(latestDate&&!$("tankHistoryDate").value)$("tankHistoryDate").value=latestDate;
-  await loadTankHistory();
 }
 
 window.loadTankHistory=async()=>{
-  let q=db.from("portlif_tank_daily")
-    .select("*,portlif_warehouse_locations(code,name)")
-    .order("record_date",{ascending:false})
-    .order("source_row",{ascending:false})
-    .limit(500);
-  const date=$("tankHistoryDate")?.value;
-  const tank=$("tankHistoryTank")?.value;
-  if(date)q=q.eq("record_date",date);
-  if(tank)q=q.eq("location_id",tank);
-  const {data=[],error}=await q;
-  if(error){$("tankHistoryTable").innerHTML='<div class="msg err">'+esc(error.message)+'</div>';return}
-  $("tankHistoryTable").innerHTML=table(["Дата","Ёмкость","Остаток, м³","Вход, м³","Выход, м³","Отгрузка, м³","Примечание"],data.map(x=>[
-    esc(x.record_date),
-    esc(x.portlif_warehouse_locations?.name||x.portlif_warehouse_locations?.code||"—"),
+  const filter=$("tankHistoryFilter")?.value||"";
+  let rows=window._tankHistory||[];
+  if(filter) rows=rows.filter(x=>x.portlif_warehouse_locations?.code===filter);
+  $("tankHistoryTable").innerHTML=table(["Дата","Ёмкость","Остаток, м³","Вход, м³","Выход, м³","Отгрузка, м³","Примечание"],rows.map(x=>[
+    new Date(x.record_date+"T00:00:00").toLocaleDateString("ru-RU"),
+    esc(x.portlif_warehouse_locations?.code||"—"),
     x.balance_m3==null?"—":Number(x.balance_m3).toLocaleString("ru-RU",{maximumFractionDigits:3}),
     x.input_m3==null?"—":Number(x.input_m3).toLocaleString("ru-RU",{maximumFractionDigits:3}),
     x.output_m3==null?"—":Number(x.output_m3).toLocaleString("ru-RU",{maximumFractionDigits:3}),
     x.shipment_m3==null?"—":Number(x.shipment_m3).toLocaleString("ru-RU",{maximumFractionDigits:3}),
-    esc(x.notes||"")
+    esc(x.notes||"—")
   ]));
-}
+};
 
 window.saveWarehouseLocation=async()=>{
   const row={
