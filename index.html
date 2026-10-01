@@ -41,7 +41,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <div id="appView" class="shell hidden">
 <aside class="side"><div class="logo"><div class="mark"><img src="https://portlif.ee/favicon.ico" alt="Portlif Grupp OÜ"></div><div><b>PORTLIF IMS</b><div style="opacity:.65;font-size:12px">Portlif Grupp OÜ</div></div></div>
 <div class="nav">
-<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="equipment">Оборудование</button>
+<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button>
 </div></aside>
 <main class="main">
 <div class="top"><div><span class="badge" id="roleBadge">PORTLIF</span><h1 id="pageTitle">Главная</h1></div><div><span id="userEmail" class="muted"></span> <button id="logoutBtn" class="btn soft">Выйти</button></div></div>
@@ -91,6 +91,80 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <section id="docs" class="section"><div class="panel"><div class="toolbar"><h3>Документы IMS</h3><button class="btn primary" onclick="toggle('docForm')">+ Документ</button></div>
 <div id="docForm" class="hidden"><div class="formgrid"><div><label>Название</label><input id="dTitle" class="field"></div><div><label>Тип</label><input id="dType" class="field" placeholder="procedure / permit / instruction"></div><div><label>№ документа</label><input id="dNo" class="field"></div><div><label>Версия</label><input id="dVer" class="field"></div><div><label>Действует до</label><input id="dValid" type="date" class="field"></div><div><label>Пересмотр</label><input id="dReview" type="date" class="field"></div></div><div class="actions"><button class="btn primary" onclick="saveDoc()">Сохранить</button></div></div><div id="docsTable" class="tablewrap"></div></div></section>
 
+
+<section id="warehouse" class="section">
+  <div class="grid">
+    <div class="stat"><span>Остаток отходов, т</span><b id="whTotal">0</b></div>
+    <div class="stat"><span>Мест хранения</span><b id="whLocations">0</b></div>
+    <div class="stat"><span>Партий на складе</span><b id="whLots">0</b></div>
+    <div class="stat"><span>На карантине, т</span><b id="whQuarantine">0</b></div>
+  </div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <h3>Места хранения</h3>
+      <button class="btn primary" onclick="toggle('whLocationForm')">+ Место хранения</button>
+    </div>
+    <div id="whLocationForm" class="hidden">
+      <div class="formgrid">
+        <div><label>Код</label><input id="whLocCode" class="field" placeholder="T-01"></div>
+        <div><label>Название</label><input id="whLocName" class="field" placeholder="Резервуар 1"></div>
+        <div><label>Тип</label><select id="whLocType" class="field">
+          <option value="warehouse">Склад</option>
+          <option value="tank">Резервуар</option>
+          <option value="container">Контейнер</option>
+          <option value="yard">Площадка</option>
+          <option value="bay">Секция</option>
+          <option value="other">Другое</option>
+        </select></div>
+        <div><label>Вместимость, т</label><input id="whLocCapacity" class="field" type="number" step="0.001"></div>
+        <div class="span2"><label>Комментарий</label><input id="whLocNotes" class="field"></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" onclick="saveWarehouseLocation()">Сохранить</button>
+        <button class="btn soft" onclick="toggle('whLocationForm')">Отмена</button>
+      </div>
+    </div>
+    <div id="whLocationsTable" class="tablewrap"></div>
+  </div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <h3>Остатки отходов</h3>
+      <button class="btn primary" onclick="toggle('whStockForm')">+ Принять на склад</button>
+    </div>
+    <div id="whStockForm" class="hidden">
+      <div class="formgrid">
+        <div><label>Место хранения</label><select id="whStockLocation" class="field"></select></div>
+        <div><label>Партия</label><select id="whStockLot" class="field"><option value="">Без привязки</option></select></div>
+        <div><label>Код отхода</label><select id="whStockWasteCode" class="field"><option value="">Не указан</option></select></div>
+        <div><label>Описание</label><input id="whStockDesc" class="field" placeholder="Нефтесодержащий шлам"></div>
+        <div><label>Количество, т</label><input id="whStockQty" class="field" type="number" step="0.001"></div>
+        <div><label>Резервуар / тара</label><input id="whStockContainer" class="field" placeholder="Tank 50 m³"></div>
+        <div><label>Дата приёмки</label><input id="whStockDate" class="field" type="date"></div>
+        <div><label>Статус</label><select id="whStockStatus" class="field">
+          <option value="stored">На хранении</option>
+          <option value="quarantine">Карантин</option>
+          <option value="processing">В переработке</option>
+          <option value="reserved">Зарезервировано</option>
+          <option value="released">Разрешено к отгрузке</option>
+        </select></div>
+        <div><label>Документ прихода</label><input id="whStockDoc" class="field"></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" onclick="saveWarehouseStock()">Принять</button>
+        <button class="btn soft" onclick="toggle('whStockForm')">Отмена</button>
+      </div>
+    </div>
+    <div id="whStockTable" class="tablewrap"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Последние движения</h3>
+    <div id="whMovementsTable" class="tablewrap"></div>
+  </div>
+</section>
+
 <section id="equipment" class="section"><div class="panel"><div class="toolbar"><h3>Оборудование</h3><button class="btn primary" onclick="toggle('eqForm')">+ Оборудование</button></div>
 <div id="eqForm" class="hidden"><div class="formgrid"><div><label>Наименование</label><input id="eName" class="field"></div><div><label>Модель</label><input id="eModel" class="field"></div><div><label>Серийный №</label><input id="eSerial" class="field"></div><div><label>Место</label><input id="eLocation" class="field"></div><div><label>Следующее ТО</label><input id="eService" type="date" class="field"></div><div><label>Критичное</label><select id="eCritical" class="field"><option value="false">Нет</option><option value="true">Да</option></select></div></div><div class="actions"><button class="btn primary" onclick="saveEquipment()">Сохранить</button></div></div><div id="eqTable" class="tablewrap"></div></div></section>
 </main></div>
@@ -129,7 +203,7 @@ async function count(t,notClosed){let q=db.from(t).select("*",{count:"exact",hea
 async function refreshAll(){
  const [clients,lots,ship,capa,risks,inc,aud]=await Promise.all([count("portlif_counterparties"),count("portlif_lots","closed"),count("portlif_shipments","cancelled"),count("portlif_capa","closed"),count("portlif_risks"),count("portlif_incidents"),count("portlif_audits")]);
  $("kClients").textContent=clients;$("kLots").textContent=lots;$("kShip").textContent=ship;$("kCapa").textContent=capa;$("isoRisks").textContent=risks;$("isoIncidents").textContent=inc;$("isoCapa").textContent=capa;$("isoAudits").textContent=aud;
- await Promise.all([loadServices(),loadClients(),loadLots(),loadShipments(),loadLab(),loadRisks(),loadDocs(),loadEquipment()]);
+ await Promise.all([loadServices(),loadClients(),loadLots(),loadShipments(),loadLab(),loadRisks(),loadDocs(),loadWarehouse(),loadEquipment()]);
 }
 async function loadServices(){const {data=[]}=await db.from("portlif_service_catalog").select("*").eq("active",true).order("sort_order");$("services").innerHTML=data.map(x=>'<div class="card"><b>'+esc(x.name_ru)+'</b><div class="muted" style="margin-top:5px">'+esc(x.description_ru||"")+'</div></div>').join("")}
 async function loadClients(){const {data=[]}=await db.from("portlif_counterparties").select("*").order("name");$("clientsTable").innerHTML=table(["Название","Тип","Страна","Контакт","Email"],data.map(x=>[esc(x.name),esc(x.kind),esc(x.country||"—"),esc(x.contact_name||x.phone||"—"),esc(x.email||"—")]))}
@@ -143,6 +217,100 @@ async function loadRisks(){const {data=[]}=await db.from("portlif_risks").select
 window.saveRisk=async()=>{const row={area:$("rArea").value.trim(),title:$("rTitle").value.trim(),risk_type:$("rType").value,likelihood:Number($("rL").value)||null,consequence:Number($("rC").value)||null,status:"open"};if(!row.area||!row.title)return alert("Заполните область и риск");const {error}=await db.from("portlif_risks").insert(row);if(error)return alert(error.message);toggle("riskForm");await refreshAll()};
 async function loadDocs(){const {data=[]}=await db.from("portlif_documents").select("*").order("created_at",{ascending:false});$("docsTable").innerHTML=table(["Название","Тип","№","Версия","Действует до","Пересмотр","Статус"],data.map(x=>[esc(x.title),esc(x.document_type),esc(x.document_no||"—"),esc(x.version||"—"),x.valid_until||"—",x.review_due||"—",esc(x.status)]))}
 window.saveDoc=async()=>{const row={title:$("dTitle").value.trim(),document_type:$("dType").value.trim(),document_no:$("dNo").value.trim()||null,version:$("dVer").value.trim()||null,valid_until:$("dValid").value||null,review_due:$("dReview").value||null,created_by:user.id,status:"active"};if(!row.title||!row.document_type)return alert("Введите название и тип");const {error}=await db.from("portlif_documents").insert(row);if(error)return alert(error.message);toggle("docForm");await refreshAll()};
+
+async function loadWarehouse(){
+  const [{data:locs=[]},{data:stock=[]},{data:movs=[]},{data:lots=[]},{data:codes=[]}] = await Promise.all([
+    db.from("portlif_warehouse_locations").select("*").eq("active",true).order("code"),
+    db.from("portlif_waste_inventory").select("*,portlif_warehouse_locations(code,name),portlif_lots(lot_no),portlif_waste_codes(ewc_code,description)").order("created_at",{ascending:false}),
+    db.from("portlif_waste_movements").select("*,portlif_waste_inventory(description,container_ref)").order("movement_at",{ascending:false}).limit(30),
+    db.from("portlif_lots").select("id,lot_no,product_name,status").neq("status","closed").order("created_at",{ascending:false}),
+    db.from("portlif_waste_codes").select("id,ewc_code,description").order("ewc_code")
+  ]);
+
+  const total=stock.reduce((s,x)=>s+Number(x.quantity_t||0),0);
+  const quarantine=stock.filter(x=>x.status==="quarantine").reduce((s,x)=>s+Number(x.quantity_t||0),0);
+  $("whTotal").textContent=total.toLocaleString("ru-RU",{maximumFractionDigits:3});
+  $("whLocations").textContent=locs.length;
+  $("whLots").textContent=new Set(stock.map(x=>x.lot_id).filter(Boolean)).size;
+  $("whQuarantine").textContent=quarantine.toLocaleString("ru-RU",{maximumFractionDigits:3});
+
+  $("whLocationsTable").innerHTML=table(["Код","Название","Тип","Вместимость, т","Статус"],locs.map(x=>[
+    esc(x.code),esc(x.name),esc(x.location_type),x.capacity_t??"—",x.active?"Активно":"Отключено"
+  ]));
+
+  $("whStockTable").innerHTML=table(["Место","Код отхода","Партия","Описание","Остаток, т","Тара","Статус"],stock.map(x=>[
+    esc(x.portlif_warehouse_locations?.code||x.portlif_warehouse_locations?.name||"—"),
+    esc(x.portlif_waste_codes?.ewc_code||"—"),
+    esc(x.portlif_lots?.lot_no||"—"),
+    esc(x.description||x.portlif_waste_codes?.description||"—"),
+    Number(x.quantity_t||0).toLocaleString("ru-RU",{maximumFractionDigits:3}),
+    esc(x.container_ref||"—"),
+    esc(x.status)
+  ]));
+
+  $("whMovementsTable").innerHTML=table(["Дата","Тип","Количество, т","Описание","Документ"],movs.map(x=>[
+    new Date(x.movement_at).toLocaleString("ru-RU"),
+    esc(x.movement_type),
+    Number(x.quantity_t||0).toLocaleString("ru-RU",{maximumFractionDigits:3}),
+    esc(x.portlif_waste_inventory?.description||x.portlif_waste_inventory?.container_ref||"—"),
+    esc(x.document_no||"—")
+  ]));
+
+  $("whStockLocation").innerHTML=locs.length
+    ? locs.map(x=>'<option value="'+x.id+'">'+esc(x.code+" · "+x.name)+'</option>').join("")
+    : '<option value="">Сначала добавьте место хранения</option>';
+
+  $("whStockLot").innerHTML='<option value="">Без привязки</option>'+lots.map(x=>'<option value="'+x.id+'">'+esc(x.lot_no+" · "+(x.product_name||""))+'</option>').join("");
+  $("whStockWasteCode").innerHTML='<option value="">Не указан</option>'+codes.map(x=>'<option value="'+x.id+'">'+esc(x.ewc_code+" · "+x.description)+'</option>').join("");
+}
+
+window.saveWarehouseLocation=async()=>{
+  const row={
+    code:$("whLocCode").value.trim(),
+    name:$("whLocName").value.trim(),
+    location_type:$("whLocType").value,
+    capacity_t:Number($("whLocCapacity").value)||null,
+    notes:$("whLocNotes").value.trim()||null
+  };
+  if(!row.code||!row.name)return alert("Введите код и название места хранения");
+  const {error}=await db.from("portlif_warehouse_locations").insert(row);
+  if(error)return alert(error.message);
+  toggle("whLocationForm"); await loadWarehouse();
+};
+
+window.saveWarehouseStock=async()=>{
+  const quantity=Number($("whStockQty").value);
+  const locationId=$("whStockLocation").value;
+  if(!locationId)return alert("Сначала выберите место хранения");
+  if(!(quantity>0))return alert("Введите количество больше 0");
+
+  const row={
+    location_id:locationId,
+    lot_id:$("whStockLot").value||null,
+    waste_code_id:$("whStockWasteCode").value||null,
+    description:$("whStockDesc").value.trim()||null,
+    quantity_t:quantity,
+    container_ref:$("whStockContainer").value.trim()||null,
+    received_at:$("whStockDate").value||null,
+    status:$("whStockStatus").value,
+    created_by:user.id
+  };
+  const ins=await db.from("portlif_waste_inventory").insert(row).select("id").single();
+  if(ins.error)return alert(ins.error.message);
+
+  const move=await db.from("portlif_waste_movements").insert({
+    inventory_id:ins.data.id,
+    movement_type:"receipt",
+    quantity_t:quantity,
+    to_location_id:locationId,
+    document_no:$("whStockDoc").value.trim()||null,
+    created_by:user.id
+  });
+  if(move.error)return alert("Остаток принят, но не записалось движение: "+move.error.message);
+
+  toggle("whStockForm"); await loadWarehouse();
+};
+
 async function loadEquipment(){const {data=[]}=await db.from("portlif_equipment").select("*").order("name");$("eqTable").innerHTML=table(["Оборудование","Модель","Серийный №","Место","Следующее ТО","Критичное","Статус"],data.map(x=>[esc(x.name),esc(x.model||"—"),esc(x.serial_no||"—"),esc(x.location||"—"),x.next_service_date||"—",x.critical?"Да":"Нет",esc(x.status)]))}
 window.saveEquipment=async()=>{const row={name:$("eName").value.trim(),model:$("eModel").value.trim()||null,serial_no:$("eSerial").value.trim()||null,location:$("eLocation").value.trim()||null,next_service_date:$("eService").value||null,critical:$("eCritical").value==="true",status:"active"};if(!row.name)return alert("Введите наименование");const {error}=await db.from("portlif_equipment").insert(row);if(error)return alert(error.message);toggle("eqForm");await refreshAll()};
 await boot();
