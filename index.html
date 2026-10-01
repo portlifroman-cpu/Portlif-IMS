@@ -126,7 +126,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
           <option value="bay">Секция</option>
           <option value="other">Другое</option>
         </select></div>
-        <div><label>Вместимость, т</label><input id="whLocCapacity" class="field" type="number" step="0.001"></div>
+        <div><label>Вместимость, м³</label><input id="whLocCapacity" class="field" type="number" step="0.001"></div>
         <div class="span2"><label>Комментарий</label><input id="whLocNotes" class="field"></div>
       </div>
       <div class="actions">
@@ -279,8 +279,8 @@ async function loadWarehouse(){
   }).join(""):'<div class="empty">Ёмкости ещё не заведены. Добавьте место хранения с типом «Резервуар» или «Контейнер».</div>';
 
 
-  $("whLocationsTable").innerHTML=table(["Код","Название","Тип","Вместимость, т","Статус"],locs.map(x=>[
-    esc(x.code),esc(x.name),esc(x.location_type),x.capacity_t??"—",x.active?"Активно":"Отключено"
+  $("whLocationsTable").innerHTML=table(["Код","Название","Тип","Вместимость, м³","Статус"],locs.map(x=>[
+    esc(x.code),esc(x.name),esc(x.location_type),x.capacity_m3??"—",x.active?"Активно":"Отключено"
   ]));
 
   $("whStockTable").innerHTML=table(["Место","Код отхода","Партия","Описание","Остаток, т","Тара","Статус"],stock.map(x=>[
@@ -314,7 +314,7 @@ window.saveWarehouseLocation=async()=>{
     code:$("whLocCode").value.trim(),
     name:$("whLocName").value.trim(),
     location_type:$("whLocType").value,
-    capacity_t:Number($("whLocCapacity").value)||null,
+    capacity_m3:Number($("whLocCapacity").value)||null,
     notes:$("whLocNotes").value.trim()||null
   };
   if(!row.code||!row.name)return alert("Введите код и название места хранения");
