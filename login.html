@@ -32,7 +32,7 @@ document.getElementById("login").onclick=async()=>{
   if(password.length<8){msg.textContent="Введите пароль не короче 8 символов.";return}
   msg.textContent="Входим…";
   const {error}=await db.auth.signInWithPassword({
-    email:"portlif.roman@gmail.com",
+    email:"roman@portlif.ee",
     password
   });
   if(error){msg.textContent="Ошибка входа: неверный пароль.";return}
