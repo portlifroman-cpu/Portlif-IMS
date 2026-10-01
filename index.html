@@ -15,7 +15,7 @@ button,input,select,textarea{font:inherit}.hidden{display:none!important}
 .main{padding:24px 28px}.top{display:flex;justify-content:space-between;gap:14px;align-items:center;margin-bottom:20px}.top h1{margin:4px 0 0;font-size:28px}.badge{display:inline-flex;padding:5px 8px;border-radius:999px;background:#e7f4f6;color:var(--brand);font-size:12px;font-weight:750}
 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:15px;padding:17px}.stat b{display:block;font-size:28px;margin-top:5px}.panel{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px;margin-top:14px}.toolbar{display:flex;gap:10px;align-items:end;justify-content:space-between;flex-wrap:wrap}.toolbar h3{margin:0}.section{display:none}.section.active{display:block}
 table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px;border-bottom:1px solid #edf1f2;text-align:left;font-size:13px}th{color:var(--muted);font-size:12px}.tablewrap{overflow:auto}
-.formgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.span2{grid-column:span 2}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.empty{padding:20px 0;color:var(--muted)}
+.formgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.span2{grid-column:span 2}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.empty{padding:20px 0;color:var(--muted)}.tankgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}.tankcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}.tankhead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.tankcode{font-size:12px;font-weight:800;color:var(--brand);background:#e7f4f6;border-radius:999px;padding:4px 8px}.tankqty{font-size:26px;font-weight:850;margin:10px 0 4px}.tankbar{height:10px;border-radius:999px;background:#e8eef0;overflow:hidden;margin:10px 0}.tankfill{height:100%;background:var(--brand);border-radius:999px}.tankmeta{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:var(--muted)}.clickable{cursor:pointer}.clickable:hover{outline:2px solid #c8e8ed}@media(max-width:980px){.tankgrid{grid-template-columns:repeat(2,1fr)}}@media(max-width:620px){.tankgrid{grid-template-columns:1fr}}
 @media(max-width:980px){.shell{grid-template-columns:1fr}.side{position:static;height:auto}.nav{grid-template-columns:repeat(4,1fr)}.grid{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.hero{display:none}.login{grid-template-columns:1fr}.auth{min-height:100vh}.main{padding:16px}.nav{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}.span2{grid-column:auto}.top{align-items:flex-start;flex-direction:column}}
 </style>
@@ -97,7 +97,15 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
     <div class="stat"><span>Остаток отходов, т</span><b id="whTotal">0</b></div>
     <div class="stat"><span>Мест хранения</span><b id="whLocations">0</b></div>
     <div class="stat"><span>Партий на складе</span><b id="whLots">0</b></div>
-    <div class="stat"><span>На карантине, т</span><b id="whQuarantine">0</b></div>
+    <div class="stat"><span>На карантине, т</span><b id="whQuarantine">0</b></div><div class="stat clickable" onclick="document.getElementById('tankMovementPanel').scrollIntoView({behavior:'smooth'})"><span>Движение по ёмкостям</span><b id="whTankMoves">0</b><div class="muted" style="font-size:12px;margin-top:4px">движений сегодня</div></div>
+  </div>
+
+  <div class="panel" id="tankMovementPanel">
+    <div class="toolbar">
+      <h3>Движение по ёмкостям</h3>
+      <div class="muted">Остаток · заполнение · приход · расход</div>
+    </div>
+    <div id="tankMovementCards" class="tankgrid"></div>
   </div>
 
   <div class="panel">
@@ -222,7 +230,7 @@ async function loadWarehouse(){
   const [{data:locs=[]},{data:stock=[]},{data:movs=[]},{data:lots=[]},{data:codes=[]}] = await Promise.all([
     db.from("portlif_warehouse_locations").select("*").eq("active",true).order("code"),
     db.from("portlif_waste_inventory").select("*,portlif_warehouse_locations(code,name),portlif_lots(lot_no),portlif_waste_codes(ewc_code,description)").order("created_at",{ascending:false}),
-    db.from("portlif_waste_movements").select("*,portlif_waste_inventory(description,container_ref)").order("movement_at",{ascending:false}).limit(30),
+    db.from("portlif_waste_movements").select("*,portlif_waste_inventory(description,container_ref,location_id)").order("movement_at",{ascending:false}).limit(200),
     db.from("portlif_lots").select("id,lot_no,product_name,status").neq("status","closed").order("created_at",{ascending:false}),
     db.from("portlif_waste_codes").select("id,ewc_code,description").order("ewc_code")
   ]);
@@ -233,6 +241,21 @@ async function loadWarehouse(){
   $("whLocations").textContent=locs.length;
   $("whLots").textContent=new Set(stock.map(x=>x.lot_id).filter(Boolean)).size;
   $("whQuarantine").textContent=quarantine.toLocaleString("ru-RU",{maximumFractionDigits:3});
+  const todayKey=new Date().toISOString().slice(0,10);
+  const todayMoves=movs.filter(x=>String(x.movement_at||"").slice(0,10)===todayKey);
+  $("whTankMoves").textContent=todayMoves.length;
+
+  const vesselLocs=locs.filter(x=>["tank","container"].includes(x.location_type));
+  $("tankMovementCards").innerHTML=vesselLocs.length?vesselLocs.map(loc=>{
+    const locStock=stock.filter(x=>x.location_id===loc.id);
+    const qty=locStock.reduce((s,x)=>s+Number(x.quantity_t||0),0);
+    const cap=Number(loc.capacity_t||0);
+    const pct=cap>0?Math.min(100,qty/cap*100):0;
+    const inbound=movs.filter(m=>m.to_location_id===loc.id||(!m.from_location_id&&!m.to_location_id&&m.portlif_waste_inventory?.location_id===loc.id&&["receipt","transfer_in","adjustment_plus"].includes(m.movement_type))).reduce((s,m)=>s+Number(m.quantity_t||0),0);
+    const outbound=movs.filter(m=>m.from_location_id===loc.id||(!m.from_location_id&&!m.to_location_id&&m.portlif_waste_inventory?.location_id===loc.id&&["issue","transfer_out","adjustment_minus"].includes(m.movement_type))).reduce((s,m)=>s+Number(m.quantity_t||0),0);
+    return '<div class="tankcard"><div class="tankhead"><div><b>'+esc(loc.name)+'</b><div class="muted" style="font-size:12px">'+esc(loc.location_type==="tank"?"Резервуар":"Контейнер")+'</div></div><span class="tankcode">'+esc(loc.code)+'</span></div><div class="tankqty">'+qty.toLocaleString("ru-RU",{maximumFractionDigits:3})+' т</div><div class="muted" style="font-size:12px">из '+(cap?cap.toLocaleString("ru-RU",{maximumFractionDigits:3})+" т":"—")+'</div><div class="tankbar"><div class="tankfill" style="width:'+pct.toFixed(1)+'%"></div></div><div class="tankmeta"><div>Заполнено<br><b>'+pct.toFixed(1)+'%</b></div><div>Свободно<br><b>'+(cap?Math.max(0,cap-qty).toLocaleString("ru-RU",{maximumFractionDigits:3})+" т":"—")+'</b></div><div>Приход<br><b>'+inbound.toLocaleString("ru-RU",{maximumFractionDigits:3})+' т</b></div><div>Расход<br><b>'+outbound.toLocaleString("ru-RU",{maximumFractionDigits:3})+' т</b></div></div></div>';
+  }).join(""):'<div class="empty">Ёмкости ещё не заведены. Добавьте место хранения с типом «Резервуар» или «Контейнер».</div>';
+
 
   $("whLocationsTable").innerHTML=table(["Код","Название","Тип","Вместимость, т","Статус"],locs.map(x=>[
     esc(x.code),esc(x.name),esc(x.location_type),x.capacity_t??"—",x.active?"Активно":"Отключено"
