@@ -205,6 +205,27 @@ $("authBtn").onclick=async()=>{const email=$("email").value.trim(),password=$("p
 $("ownerSignupBtn").onclick=async()=>{const email=$("email").value.trim().toLowerCase(),password=$("password").value;if(email!==OWNER_EMAIL)return msg("Первый владелец Portlif IMS должен использовать "+OWNER_EMAIL);if(password.length<8)return msg("Пароль должен содержать минимум 8 символов.");const {data,error}=await db.auth.signUp({email,password});if(error)return msg(error.message);if(data.session){await boot()}else msg("Аккаунт создан. Подтвердите email и затем войдите.",true)};
 $("recoverBtn").onclick=async()=>{const email=$("email").value.trim();if(!email)return msg("Введите email.");const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:location.origin+"/"});msg(error?error.message:"Письмо для восстановления отправлено.",!error)};
 $("logoutBtn").onclick=async()=>{await db.auth.signOut();location.reload()};
+
+$("saveNewPassword").onclick=async()=>{
+  const p1=$("newPassword1").value;
+  const p2=$("newPassword2").value;
+  const m=$("passwordResetMsg");
+  m.className="msg err";
+  if(p1.length<8){m.textContent="Пароль должен содержать минимум 8 символов.";return}
+  if(p1!==p2){m.textContent="Пароли не совпадают.";return}
+  const {error}=await db.auth.updateUser({password:p1});
+  if(error){m.textContent="Не удалось изменить пароль: "+error.message;return}
+  m.className="msg ok";
+  m.textContent="Пароль изменён. Сейчас откроется Portlif IMS.";
+  setTimeout(async()=>{ $("passwordResetModal").classList.add("hidden"); await boot(); },600);
+};
+
+db.auth.onAuthStateChange((event,session)=>{
+  if(event==="PASSWORD_RECOVERY" && session){
+    $("passwordResetModal").classList.remove("hidden");
+  }
+});
+
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));$(b.dataset.page).classList.add("active");$("pageTitle").textContent=b.textContent});
 function table(headers,rows){return '<table><thead><tr>'+headers.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr>'+r.map(x=>'<td>'+x+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+headers.length+'" class="muted">Пока нет записей</td></tr>')+'</tbody></table>'}
 async function count(t,notClosed){let q=db.from(t).select("*",{count:"exact",head:true});if(notClosed)q=q.neq("status",notClosed);const {count}=await q;return count||0}
@@ -338,4 +359,18 @@ async function loadEquipment(){const {data=[]}=await db.from("portlif_equipment"
 window.saveEquipment=async()=>{const row={name:$("eName").value.trim(),model:$("eModel").value.trim()||null,serial_no:$("eSerial").value.trim()||null,location:$("eLocation").value.trim()||null,next_service_date:$("eService").value||null,critical:$("eCritical").value==="true",status:"active"};if(!row.name)return alert("Введите наименование");const {error}=await db.from("portlif_equipment").insert(row);if(error)return alert(error.message);toggle("eqForm");await refreshAll()};
 await boot();
 </script>
+
+<div id="passwordResetModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;z-index:9999;padding:20px">
+  <div class="card" style="width:min(440px,100%)">
+    <h2 style="margin-top:0">Новый пароль</h2>
+    <div class="muted">Введите новый пароль для roman@portlif.ee.</div>
+    <label>Новый пароль</label>
+    <input id="newPassword1" class="field" type="password" autocomplete="new-password" placeholder="Минимум 8 символов">
+    <label>Повторите пароль</label>
+    <input id="newPassword2" class="field" type="password" autocomplete="new-password">
+    <button id="saveNewPassword" class="btn primary full">Сохранить новый пароль</button>
+    <div id="passwordResetMsg" class="msg"></div>
+  </div>
+</div>
+
 </body></html>
