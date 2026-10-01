@@ -122,6 +122,11 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
       <h3>Уличные ёмкости — события</h3>
       <div id="outdoorTankEvents" class="tablewrap"></div>
     </div>
+    <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:16px">
+      <h3>Технологический журнал</h3>
+      <div class="muted" style="margin-bottom:10px">Дистилляция · трикантер · пиролиз · вывоз воды · примечания</div>
+      <div id="processHistoryTable" class="tablewrap"></div>
+    </div>
   </div>
 
   <div class="panel">
@@ -273,7 +278,7 @@ async function loadWarehouse(){
     db.from("portlif_waste_movements").select("*,portlif_waste_inventory(description,container_ref,location_id)").order("movement_at",{ascending:false}).limit(200),
     db.from("portlif_lots").select("id,lot_no,product_name,status").neq("status","closed").order("created_at",{ascending:false}),
     db.from("portlif_waste_codes").select("id,ewc_code,description").order("ewc_code"),
-    db.from("portlif_tank_daily").select("*,portlif_warehouse_locations(code,name,capacity_m3)").order("record_date",{ascending:false}).limit(350),
+    db.from("portlif_tank_latest").select("*").order("code"),
     db.from("portlif_tank_events").select("*,portlif_warehouse_locations(code,name,capacity_m3)").order("event_date",{ascending:false}).limit(200),
     db.from("portlif_process_daily").select("*").order("record_date",{ascending:false}).limit(300)
   ]);
@@ -286,10 +291,7 @@ async function loadWarehouse(){
   $("whQuarantine").textContent=quarantine.toLocaleString("ru-RU",{maximumFractionDigits:3});
 
   const latestByCode={};
-  tankRecent.forEach(r=>{
-    const code=r.portlif_warehouse_locations?.code;
-    if(code && !latestByCode[code]) latestByCode[code]=r;
-  });
+  tankRecent.forEach(r=>{ if(r.code) latestByCode[r.code]=r; });
 
   const tankCodes=["M1","M2","M3","M4","M5","M6","M7"];
   const latestRows=tankCodes.map(x=>latestByCode[x]).filter(Boolean);
@@ -315,10 +317,10 @@ async function loadWarehouse(){
       (r?.notes?'<div class="muted" style="font-size:12px;margin-top:10px">'+esc(r.notes)+'</div>':'')+'</div>';
   }).join("");
 
-  window._tankHistory=tankRecent;
+  $("tankHistoryTank").innerHTML='<option value="">Все ёмкости</option>'+["M1","M2","M3","M4","M5","M6","M7"].map(x=>'<option value="'+x+'">'+x+'</option>').join("");
   await loadTankHistory();
 
-  $("streetTankTable").innerHTML=table(["Дата","Ёмкость","Количество, м³","Тип","Примечание"],streetEvents.map(x=>[
+  $("outdoorTankEvents").innerHTML=table(["Дата","Ёмкость","Количество, м³","Тип","Примечание"],streetEvents.map(x=>[
     x.event_date?new Date(x.event_date+"T00:00:00").toLocaleDateString("ru-RU"):esc(x.source_date_text||"—"),
     esc(x.portlif_warehouse_locations?.code||"—"),
     x.quantity_m3==null?"—":Number(x.quantity_m3).toLocaleString("ru-RU",{maximumFractionDigits:3}),
@@ -357,9 +359,19 @@ async function loadWarehouse(){
 }
 
 window.loadTankHistory=async()=>{
-  const filter=$("tankHistoryFilter")?.value||"";
-  let rows=window._tankHistory||[];
-  if(filter) rows=rows.filter(x=>x.portlif_warehouse_locations?.code===filter);
+  const date=$("tankHistoryDate")?.value||"";
+  const tank=$("tankHistoryTank")?.value||"";
+  let q=db.from("portlif_tank_daily")
+    .select("*,portlif_warehouse_locations(code,name,capacity_m3)")
+    .order("record_date",{ascending:false})
+    .limit(700);
+  if(date) q=q.eq("record_date",date);
+  if(tank){
+    const loc=await db.from("portlif_warehouse_locations").select("id").eq("code",tank).maybeSingle();
+    if(loc.data?.id) q=q.eq("location_id",loc.data.id);
+  }
+  const {data:rows=[],error}=await q;
+  if(error){$("tankHistoryTable").innerHTML='<div class="empty">'+esc(error.message)+'</div>';return}
   $("tankHistoryTable").innerHTML=table(["Дата","Ёмкость","Остаток, м³","Вход, м³","Выход, м³","Отгрузка, м³","Примечание"],rows.map(x=>[
     new Date(x.record_date+"T00:00:00").toLocaleDateString("ru-RU"),
     esc(x.portlif_warehouse_locations?.code||"—"),
