@@ -103,9 +103,41 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
   <div class="panel" id="tankMovementPanel">
     <div class="toolbar">
       <h3>Движение по ёмкостям</h3>
-      <div class="muted">Остаток · заполнение · приход · расход</div>
+      <div class="muted">Быстрый ввод разгрузок, перекачек и отгрузок</div>
     </div>
+
+    <div class="card" style="margin:12px 0 18px;padding:16px">
+      <div class="formgrid">
+        <div><label>Дата</label><input id="tankOpDate" class="field" type="date"></div>
+        <div><label>Операция</label><select id="tankOpType" class="field" onchange="updateTankOpFields()">
+          <option value="unload">Разгрузка в ёмкость</option>
+          <option value="transfer">Перекачка между ёмкостями</option>
+          <option value="dispatch">Отгрузка из ёмкости</option>
+          <option value="adjustment_plus">Корректировка +</option>
+          <option value="adjustment_minus">Корректировка −</option>
+        </select></div>
+        <div id="tankOpFromWrap"><label>Откуда</label><select id="tankOpFrom" class="field"></select></div>
+        <div id="tankOpToWrap"><label>Куда</label><select id="tankOpTo" class="field"></select></div>
+        <div><label>Объём, м³</label><input id="tankOpQty" class="field" type="number" min="0.001" step="0.001" inputmode="decimal" placeholder="Напр. 25"></div>
+        <div><label>Машина / документ</label><input id="tankOpDoc" class="field" placeholder="Номер машины, накладная"></div>
+        <div class="span2"><label>Примечание</label><input id="tankOpNotes" class="field" placeholder="Что разгрузили / куда перекачали"></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" onclick="saveTankOperation()">Сохранить движение</button>
+        <button class="btn soft" onclick="clearTankOperation()">Очистить</button>
+      </div>
+      <div id="tankOpMsg" class="msg"></div>
+    </div>
+
     <div id="tankMovementCards" class="tankgrid"></div>
+
+    <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:16px">
+      <div class="toolbar">
+        <h3 style="margin:0">Журнал введённых операций</h3>
+        <div class="muted">Последние 100 записей</div>
+      </div>
+      <div id="tankOperationsTable" class="tablewrap"></div>
+    </div>
     <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:16px">
       <div class="toolbar">
         <h3 style="margin:0">История движения М1–М7</h3>
@@ -270,7 +302,8 @@ window.saveDoc=async()=>{const row={title:$("dTitle").value.trim(),document_type
 async function loadWarehouse(){
   const [
     {data:locs=[]},{data:stock=[]},{data:movs=[]},{data:lots=[]},{data:codes=[]},
-    {data:tankRecent=[]},{data:streetEvents=[]},{data:processRecent=[]}
+    {data:tankRecent=[]},{data:streetEvents=[]},{data:processRecent=[]},
+    {data:tankCurrent=[]},{data:tankOps=[]}
   ] = await Promise.all([
     db.from("portlif_warehouse_locations").select("*").eq("active",true).order("code"),
     db.from("portlif_waste_inventory").select("*,portlif_warehouse_locations(code,name),portlif_lots(lot_no),portlif_waste_codes(ewc_code,description)").order("created_at",{ascending:false}),
@@ -279,7 +312,11 @@ async function loadWarehouse(){
     db.from("portlif_waste_codes").select("id,ewc_code,description").order("ewc_code"),
     db.from("portlif_tank_latest").select("*").order("code"),
     db.from("portlif_tank_events").select("*,portlif_warehouse_locations(code,name,capacity_m3)").order("event_date",{ascending:false}).limit(200),
-    db.from("portlif_process_daily").select("*").order("record_date",{ascending:false}).limit(300)
+    db.from("portlif_process_daily").select("*").order("record_date",{ascending:false}).limit(300),
+    db.from("portlif_tank_current").select("*").order("code"),
+    db.from("portlif_tank_operations")
+      .select("*,from:from_location_id(code,name),to:to_location_id(code,name)")
+      .order("operation_date",{ascending:false}).order("created_at",{ascending:false}).limit(100)
   ]);
 
   const total=stock.reduce((s,x)=>s+Number(x.quantity_t||0),0);
@@ -299,22 +336,40 @@ async function loadWarehouse(){
   const whTankMoveSub=document.querySelector("#whTankMoves + .muted");
   if(whTankMoveSub) whTankMoveSub.textContent="последние данные Excel";
 
-  const vesselLocs=locs.filter(x=>tankCodes.includes(x.code));
+  const currentByCode={};
+  tankCurrent.forEach(r=>{if(r.code)currentByCode[r.code]=r});
+  const vesselLocs=locs.filter(x=>x.location_type==="tank");
   $("tankMovementCards").innerHTML=vesselLocs.map(loc=>{
-    const r=latestByCode[loc.code];
-    const qty=r?.balance_m3==null?null:Number(r.balance_m3);
-    const cap=Number(loc.capacity_m3||200);
-    const pct=qty==null||!cap?null:Math.max(0,Math.min(100,qty/cap*100));
-    const input=r?.input_m3==null?0:Number(r.input_m3);
-    const output=r?.output_m3==null?0:Number(r.output_m3);
-    const shipment=r?.shipment_m3==null?0:Number(r.shipment_m3);
-    return '<div class="tankcard"><div class="tankhead"><div><b>'+esc(loc.name)+'</b><div class="muted" style="font-size:12px">'+(r?new Date(r.record_date+"T00:00:00").toLocaleDateString("ru-RU"):"Нет данных")+'</div></div><span class="tankcode">'+esc(loc.code)+'</span></div>'+
-      '<div class="tankqty">'+(qty==null?"—":qty.toLocaleString("ru-RU",{maximumFractionDigits:3})+" м³")+'</div>'+
-      '<div class="muted" style="font-size:12px">Вместимость '+cap.toLocaleString("ru-RU")+' м³</div>'+
+    const r=currentByCode[loc.code];
+    const qty=r?.current_balance_m3==null?0:Number(r.current_balance_m3);
+    const cap=Number(loc.capacity_m3||0);
+    const pct=cap>0?Math.max(0,Math.min(100,qty/cap*100)):null;
+    return '<div class="tankcard"><div class="tankhead"><div><b>'+esc(loc.name)+'</b><div class="muted" style="font-size:12px">Текущий остаток</div></div><span class="tankcode">'+esc(loc.code)+'</span></div>'+
+      '<div class="tankqty">'+qty.toLocaleString("ru-RU",{maximumFractionDigits:3})+' м³</div>'+
+      '<div class="muted" style="font-size:12px">Вместимость '+(cap?cap.toLocaleString("ru-RU")+" м³":"—")+'</div>'+
       '<div class="tankbar"><div class="tankfill" style="width:'+(pct??0).toFixed(1)+'%"></div></div>'+
-      '<div class="tankmeta"><div>Заполнено<br><b>'+(pct==null?"—":pct.toFixed(1)+"%")+'</b></div><div>Свободно<br><b>'+(qty==null?"—":Math.max(0,cap-qty).toLocaleString("ru-RU",{maximumFractionDigits:3})+" м³")+'</b></div><div>Вход<br><b>'+input.toLocaleString("ru-RU",{maximumFractionDigits:3})+' м³</b></div><div>Выход<br><b>'+output.toLocaleString("ru-RU",{maximumFractionDigits:3})+' м³</b></div><div>Отгрузка<br><b>'+shipment.toLocaleString("ru-RU",{maximumFractionDigits:3})+' м³</b></div></div>'+
-      (r?.notes?'<div class="muted" style="font-size:12px;margin-top:10px">'+esc(r.notes)+'</div>':'')+'</div>';
+      '<div class="tankmeta"><div>Заполнено<br><b>'+(pct==null?"—":pct.toFixed(1)+"%")+'</b></div><div>Свободно<br><b>'+(cap?Math.max(0,cap-qty).toLocaleString("ru-RU",{maximumFractionDigits:3})+" м³":"—")+'</b></div></div></div>';
   }).join("");
+
+  const tankOptions=vesselLocs.map(x=>'<option value="'+x.id+'">'+esc(x.code+" · "+x.name)+'</option>').join("");
+  $("tankOpFrom").innerHTML='<option value="">—</option>'+tankOptions;
+  $("tankOpTo").innerHTML='<option value="">—</option>'+tankOptions;
+  if(!$("tankOpDate").value){
+    const d=new Date(),off=d.getTimezoneOffset();
+    $("tankOpDate").value=new Date(d.getTime()-off*60000).toISOString().slice(0,10);
+  }
+  updateTankOpFields();
+
+  const opLabels={unload:"Разгрузка",transfer:"Перекачка",dispatch:"Отгрузка",adjustment_plus:"Корректировка +",adjustment_minus:"Корректировка −"};
+  $("tankOperationsTable").innerHTML=table(["Дата","Операция","Откуда","Куда","Объём, м³","Машина / документ","Примечание"],tankOps.map(x=>[
+    new Date(x.operation_date+"T00:00:00").toLocaleDateString("ru-RU"),
+    esc(opLabels[x.operation_type]||x.operation_type),
+    esc(x.from?.code||"—"),
+    esc(x.to?.code||"—"),
+    Number(x.quantity_m3||0).toLocaleString("ru-RU",{maximumFractionDigits:3}),
+    esc(x.vehicle_or_document||"—"),
+    esc(x.notes||"—")
+  ]));
 
   $("tankHistoryTank").innerHTML='<option value="">Все ёмкости</option>'+["M1","M2","M3","M4","M5","M6","M7"].map(x=>'<option value="'+x+'">'+x+'</option>').join("");
   await loadTankHistory();
@@ -380,6 +435,58 @@ window.loadTankHistory=async()=>{
     x.shipment_m3==null?"—":Number(x.shipment_m3).toLocaleString("ru-RU",{maximumFractionDigits:3}),
     esc(x.notes||"—")
   ]));
+};
+
+
+window.updateTankOpFields=()=>{
+  const type=$("tankOpType").value;
+  const needsFrom=["transfer","dispatch","adjustment_minus"].includes(type);
+  const needsTo=["transfer","unload","adjustment_plus"].includes(type);
+  $("tankOpFromWrap").style.display=needsFrom?"block":"none";
+  $("tankOpToWrap").style.display=needsTo?"block":"none";
+  if(!needsFrom)$("tankOpFrom").value="";
+  if(!needsTo)$("tankOpTo").value="";
+};
+
+window.clearTankOperation=()=>{
+  $("tankOpQty").value="";
+  $("tankOpDoc").value="";
+  $("tankOpNotes").value="";
+  $("tankOpMsg").textContent="";
+  $("tankOpQty").focus();
+};
+
+window.saveTankOperation=async()=>{
+  const type=$("tankOpType").value;
+  const from=$("tankOpFrom").value||null;
+  const to=$("tankOpTo").value||null;
+  const qty=Number(String($("tankOpQty").value).replace(",","."));
+  const date=$("tankOpDate").value;
+  const m=$("tankOpMsg");
+  m.className="msg err"; m.textContent="";
+  if(!date){m.textContent="Укажите дату.";return}
+  if(!(qty>0)){m.textContent="Введите объём больше 0.";return}
+  if(type==="transfer"&&(!from||!to)){m.textContent="Для перекачки выберите «Откуда» и «Куда».";return}
+  if(type==="transfer"&&from===to){m.textContent="Нельзя перекачать в ту же ёмкость.";return}
+  if(["dispatch","adjustment_minus"].includes(type)&&!from){m.textContent="Выберите ёмкость «Откуда».";return}
+  if(["unload","adjustment_plus"].includes(type)&&!to){m.textContent="Выберите ёмкость «Куда».";return}
+
+  const row={
+    operation_date:date,
+    operation_type:type,
+    from_location_id:from,
+    to_location_id:to,
+    quantity_m3:qty,
+    vehicle_or_document:$("tankOpDoc").value.trim()||null,
+    notes:$("tankOpNotes").value.trim()||null,
+    created_by:user.id
+  };
+  const {error}=await db.from("portlif_tank_operations").insert(row);
+  if(error){m.textContent=error.message;return}
+  m.className="msg ok";m.textContent="Движение сохранено.";
+  clearTankOperation();
+  m.className="msg ok";m.textContent="Движение сохранено.";
+  await loadWarehouse();
 };
 
 window.saveWarehouseLocation=async()=>{
