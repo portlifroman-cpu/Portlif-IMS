@@ -221,7 +221,8 @@ async function boot(){
  try{membership=await ensureMembership();$("userEmail").textContent=user.email||"";$("roleBadge").textContent=membership.role.toUpperCase();$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");await refreshAll()}
  catch(e){await db.auth.signOut();msg(e.message)}
 }
-$("authBtn").onclick=async()=>{const email=$("email").value.trim().toLowerCase(),password=$("password").value;if(!email)return msg("Введите email.");if(password.length<8)return msg("Введите пароль не короче 8 символов.");const {error}=await db.auth.signInWithPassword({email,password});if(error)return msg("Ошибка входа: "+error.message);await boot()};\n$("password").addEventListener("keydown",e=>{if(e.key==="Enter")$("authBtn").click()});
+$("authBtn").onclick=async()=>{const email=$("email").value.trim().toLowerCase(),password=$("password").value;if(!email)return msg("Введите email.");if(password.length<8)return msg("Введите пароль не короче 8 символов.");const {error}=await db.auth.signInWithPassword({email,password});if(error)return msg("Ошибка входа: "+error.message);await boot()};
+$("password").addEventListener("keydown",e=>{if(e.key==="Enter")$("authBtn").click()});
 $("recoverBtn").onclick=async()=>{const email=$("email").value.trim().toLowerCase();if(!email)return msg("Введите email.");const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:location.origin+"/"});msg(error?error.message:"Ссылка для нового пароля отправлена на "+email+".",!error)};
 $("logoutBtn").onclick=async()=>{await db.auth.signOut();location.reload()};
 
@@ -233,10 +234,10 @@ $("saveNewPassword").onclick=async()=>{
   if(p1.length<8){m.textContent="Пароль должен содержать минимум 8 символов.";return}
   if(p1!==p2){m.textContent="Пароли не совпадают.";return}
   const {error}=await db.auth.updateUser({password:p1});
-  if(error){m.textContent="Не удалось изменить пароль: "+error.message;return}
+  if(error && error.code!=="same_password"){m.textContent="Не удалось изменить пароль: "+error.message;return}
   m.className="msg ok";
-  m.textContent="Пароль изменён. Сейчас откроется Portlif IMS.";
-  setTimeout(async()=>{ $("passwordResetModal").classList.add("hidden"); await boot(); },600);
+  m.textContent=error?.code==="same_password"?"Этот пароль уже установлен. Открываю Portlif IMS.":"Пароль изменён. Сейчас откроется Portlif IMS.";
+  setTimeout(async()=>{ $("passwordResetModal").classList.add("hidden"); await boot(); },300);
 };
 
 db.auth.onAuthStateChange((event,session)=>{
