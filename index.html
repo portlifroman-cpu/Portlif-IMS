@@ -33,6 +33,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <label>Email</label><input id="email" class="field" type="email" autocomplete="email" value="roman@portlif.ee">
 <label>Пароль</label><input id="password" class="field" type="password" autocomplete="current-password" autofocus placeholder="Введите пароль">
 <button id="authBtn" class="btn primary full">Войти</button>
+<button id="employeeSignupBtn" class="btn soft full">Первый вход сотрудника</button>
 <button id="recoverBtn" class="btn soft full" style="border:0;background:transparent">Забыли пароль?</button>
 <div id="authMsg" class="msg"></div>
 </div></section>
@@ -244,9 +245,16 @@ function msg(t,ok=false){$("authMsg").textContent=t||"";$("authMsg").className="
 async function ensureMembership(){
  const {data,error}=await db.from("portlif_memberships").select("*").eq("user_id",user.id).maybeSingle(); if(error)throw error;
  if(data){if(!data.active)throw new Error("Доступ к Portlif IMS отключён");return data}
- if(!OWNER_EMAILS.includes((user.email||"").toLowerCase()))throw new Error("Учётная запись существует, но доступ к Portlif IMS ещё не назначен руководителем.");
- const ins=await db.from("portlif_memberships").insert({user_id:user.id,full_name:user.email,role:"owner",active:true}).select().single();
- if(ins.error)throw new Error("Не удалось назначить доступ владельца: "+ins.error.message); return ins.data;
+ const email=(user.email||"").toLowerCase();
+ if(OWNER_EMAILS.includes(email)){
+   const ins=await db.from("portlif_memberships").insert({user_id:user.id,full_name:user.email,role:"owner",active:true}).select().single();
+   if(ins.error)throw new Error("Не удалось назначить доступ владельца: "+ins.error.message); return ins.data;
+ }
+ const {data:invite,error:inviteErr}=await db.from("portlif_invited_users").select("full_name,role,active").eq("email",email).maybeSingle();
+ if(inviteErr)throw inviteErr;
+ if(!invite?.active)throw new Error("Учётная запись существует, но доступ к Portlif IMS ещё не назначен руководителем.");
+ const ins=await db.from("portlif_memberships").insert({user_id:user.id,full_name:invite.full_name||user.email,role:invite.role,active:true}).select().single();
+ if(ins.error)throw new Error("Не удалось активировать доступ: "+ins.error.message); return ins.data;
 }
 async function boot(){
  const {data:{user:u}}=await db.auth.getUser(); user=u; if(!user)return;
@@ -255,6 +263,14 @@ async function boot(){
 }
 $("authBtn").onclick=async()=>{const email=$("email").value.trim().toLowerCase(),password=$("password").value;if(!email)return msg("Введите email.");if(password.length<8)return msg("Введите пароль не короче 8 символов.");const {error}=await db.auth.signInWithPassword({email,password});if(error)return msg("Ошибка входа: "+error.message);await boot()};
 $("password").addEventListener("keydown",e=>{if(e.key==="Enter")$("authBtn").click()});
+$("employeeSignupBtn").onclick=async()=>{
+  const email=$("email").value.trim().toLowerCase(),password=$("password").value;
+  if(!email)return msg("Введите email.");
+  if(password.length<8)return msg("Пароль должен содержать минимум 8 символов.");
+  const {data,error}=await db.auth.signUp({email,password,options:{emailRedirectTo:location.origin+"/"}});
+  if(error)return msg("Не удалось создать вход: "+error.message);
+  if(data.session){await boot()}else msg("Первый вход создан. Откройте письмо подтверждения и затем войдите.",true);
+};
 $("recoverBtn").onclick=async()=>{const email=$("email").value.trim().toLowerCase();if(!email)return msg("Введите email.");const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:location.origin+"/"});msg(error?error.message:"Ссылка для нового пароля отправлена на "+email+".",!error)};
 $("logoutBtn").onclick=async()=>{await db.auth.signOut();location.reload()};
 
