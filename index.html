@@ -295,12 +295,22 @@ window.invitePortlifUser=async()=>{
   await loadPortlifUsers();
 };
 
+window.deletePortlifUser=async(userId)=>{
+  if(!confirm("Удалить сотрудника из Portlif IMS? Он больше не сможет войти."))return;
+  const {data,error}=await db.functions.invoke("portlif-users",{body:{action:"delete",user_id:userId}});
+  if(error||data?.error){alert(data?.error||error?.message||"Не удалось удалить сотрудника");return}
+  await loadPortlifUsers();
+};
+
 window.loadPortlifUsers=async()=>{
   const {data,error}=await db.functions.invoke("portlif-users",{body:{action:"list"}});
   if(error||data?.error){$("usersTable").innerHTML='<div class="empty">'+esc(data?.error||error?.message||"Ошибка")+'</div>';return}
   const labels={owner:"Руководитель",manager:"Руководитель",qhse:"QHSE",logistics:"Логистика",accounting:"Бухгалтерия",employee:"Сотрудник",auditor:"Аудитор"};
-  $("usersTable").innerHTML=table(["Сотрудник","Роль","Доступ"],(data.users||[]).map(x=>[
-    esc(x.full_name||x.user_id),esc(labels[x.role]||x.role),x.active?"Активен":"Отключён"
+  $("usersTable").innerHTML=table(["Сотрудник","Роль","Доступ","Действие"],(data.users||[]).map(x=>[
+    esc(x.full_name||x.user_id),
+    esc(labels[x.role]||x.role),
+    x.active?"Активен":"Отключён",
+    x.role==="owner"?"—":'<button class="btn soft" onclick="deletePortlifUser(\''+x.user_id+'\')">Удалить</button>'
   ]));
 };
 
