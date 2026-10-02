@@ -41,7 +41,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <div id="appView" class="shell hidden">
 <aside class="side"><div class="logo"><div class="mark"><img src="/portlif-logo.svg" alt="Portlif Grupp OÜ"></div><div><b>PORTLIF IMS</b><div style="opacity:.65;font-size:12px">Portlif Grupp OÜ</div></div></div>
 <div class="nav">
-<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button>
+<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="wasteMovement">Движение отходов</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button>
 </div></aside>
 <main class="main">
 <div class="top"><div><span class="badge" id="roleBadge">PORTLIF</span><h1 id="pageTitle">Главная</h1></div><div><span id="userEmail" class="muted"></span> <button id="logoutBtn" class="btn soft">Выйти</button></div></div>
@@ -110,6 +110,34 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <section id="docs" class="section"><div class="panel"><div class="toolbar"><h3>Документы IMS</h3><button class="btn primary" onclick="toggle('docForm')">+ Документ</button></div>
 <div id="docForm" class="hidden"><div class="formgrid"><div><label>Название</label><input id="dTitle" class="field"></div><div><label>Тип</label><input id="dType" class="field" placeholder="procedure / permit / instruction"></div><div><label>№ документа</label><input id="dNo" class="field"></div><div><label>Версия</label><input id="dVer" class="field"></div><div><label>Действует до</label><input id="dValid" type="date" class="field"></div><div><label>Пересмотр</label><input id="dReview" type="date" class="field"></div></div><div class="actions"><button class="btn primary" onclick="saveDoc()">Сохранить</button></div></div><div id="docsTable" class="tablewrap"></div></div></section>
 
+
+
+<section id="wasteMovement" class="section">
+  <div class="grid">
+    <div class="stat"><span>Принято за месяц, кг</span><b id="wmReceived">0</b></div>
+    <div class="stat"><span>Отдали воды, кг</span><b id="wmWater">0</b></div>
+    <div class="stat"><span>Продали продукта, кг</span><b id="wmProduct">0</b></div>
+    <div class="stat"><span>Документов</span><b id="wmDocs">0</b></div>
+  </div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <h3>Движение отходов</h3>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="margin:0">Месяц</label>
+        <input id="wmMonth" class="field" type="month" value="2026-07" style="width:160px">
+        <button class="btn soft" onclick="loadWasteMovement()">Показать</button>
+      </div>
+    </div>
+    <div class="muted" style="margin-bottom:10px">Отдельный журнал. Не связан с движением по ёмкостям.</div>
+    <div id="wmTable" class="tablewrap"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Остатки на начало / конец месяца</h3>
+    <div id="wmBalances" class="tablewrap"></div>
+  </div>
+</section>
 
 <section id="warehouse" class="section">
   <div class="grid">
@@ -345,7 +373,7 @@ async function count(t,notClosed){let q=db.from(t).select("*",{count:"exact",hea
 async function refreshAll(){
  const [clients,lots,ship,capa,risks,inc,aud]=await Promise.all([count("portlif_counterparties"),count("portlif_lots","closed"),count("portlif_shipments","cancelled"),count("portlif_capa","closed"),count("portlif_risks"),count("portlif_incidents"),count("portlif_audits")]);
  $("kClients").textContent=clients;$("kLots").textContent=lots;$("kShip").textContent=ship;$("kCapa").textContent=capa;$("isoRisks").textContent=risks;$("isoIncidents").textContent=inc;$("isoCapa").textContent=capa;$("isoAudits").textContent=aud;
- await Promise.all([loadServices(),loadClients(),loadLots(),loadShipments(),loadLab(),loadRisks(),loadDocs(),loadWarehouse(),loadEquipment()]);
+ await Promise.all([loadServices(),loadClients(),loadLots(),loadShipments(),loadLab(),loadRisks(),loadDocs(),loadWasteMovement(),loadWarehouse(),loadEquipment()]);
 }
 async function loadServices(){const {data=[]}=await db.from("portlif_service_catalog").select("*").eq("active",true).order("sort_order");$("services").innerHTML=data.map(x=>'<div class="card"><b>'+esc(x.name_ru)+'</b><div class="muted" style="margin-top:5px">'+esc(x.description_ru||"")+'</div></div>').join("")}
 async function loadClients(){const {data=[]}=await db.from("portlif_counterparties").select("*").order("name");$("clientsTable").innerHTML=table(["Название","Тип","Страна","Контакт","Email"],data.map(x=>[esc(x.name),esc(x.kind),esc(x.country||"—"),esc(x.contact_name||x.phone||"—"),esc(x.email||"—")]))}
@@ -359,6 +387,59 @@ async function loadRisks(){const {data=[]}=await db.from("portlif_risks").select
 window.saveRisk=async()=>{const row={area:$("rArea").value.trim(),title:$("rTitle").value.trim(),risk_type:$("rType").value,likelihood:Number($("rL").value)||null,consequence:Number($("rC").value)||null,status:"open"};if(!row.area||!row.title)return alert("Заполните область и риск");const {error}=await db.from("portlif_risks").insert(row);if(error)return alert(error.message);toggle("riskForm");await refreshAll()};
 async function loadDocs(){const {data=[]}=await db.from("portlif_documents").select("*").order("created_at",{ascending:false});$("docsTable").innerHTML=table(["Название","Тип","№","Версия","Действует до","Пересмотр","Статус"],data.map(x=>[esc(x.title),esc(x.document_type),esc(x.document_no||"—"),esc(x.version||"—"),x.valid_until||"—",x.review_due||"—",esc(x.status)]))}
 window.saveDoc=async()=>{const row={title:$("dTitle").value.trim(),document_type:$("dType").value.trim(),document_no:$("dNo").value.trim()||null,version:$("dVer").value.trim()||null,valid_until:$("dValid").value||null,review_due:$("dReview").value||null,created_by:user.id,status:"active"};if(!row.title||!row.document_type)return alert("Введите название и тип");const {error}=await db.from("portlif_documents").insert(row);if(error)return alert(error.message);toggle("docForm");await refreshAll()};
+
+
+window.loadWasteMovement=async()=>{
+  const month=$("wmMonth")?.value||"2026-07";
+  const start=month+"-01";
+  const d=new Date(start+"T00:00:00");
+  const next=new Date(d.getFullYear(),d.getMonth()+1,1);
+  const nextStr=next.getFullYear()+"-"+String(next.getMonth()+1).padStart(2,"0")+"-01";
+
+  const [{data:rows=[],error:e1},{data:balances=[],error:e2},{data:summary=[],error:e3}] = await Promise.all([
+    db.from("portlif_waste_movement_registry").select("*").gte("report_month",start).lt("report_month",nextStr).order("document_created_at",{ascending:false}),
+    db.from("portlif_waste_month_balances").select("*").gte("report_month",start).lt("report_month",nextStr).order("waste_code"),
+    db.from("portlif_waste_month_summary").select("*").gte("report_month",start).lt("report_month",nextStr).limit(1)
+  ]);
+
+  if(e1||e2||e3){
+    const err=e1||e2||e3;
+    $("wmTable").innerHTML='<div class="empty">'+esc(err.message)+'</div>';
+    return;
+  }
+
+  const s=summary[0]||{};
+  $("wmReceived").textContent=Number(s.received_kg||0).toLocaleString("ru-RU");
+  $("wmWater").textContent=Number(s.water_out_kg||0).toLocaleString("ru-RU");
+  $("wmProduct").textContent=Number(s.product_sold_kg||0).toLocaleString("ru-RU");
+  $("wmDocs").textContent=rows.length;
+
+  $("wmTable").innerHTML=table(
+    ["№ документа","Дата / время","Передал","Машина","Код отхода","Количество, кг","R-код"],
+    rows.map(x=>[
+      esc(x.consignment_no),
+      x.document_created_at?new Date(x.document_created_at).toLocaleString("ru-RU"):"—",
+      esc(x.transferor_name||"—"),
+      esc(x.vehicle_reg||"—"),
+      esc(x.waste_code||"—"),
+      Number(x.quantity_kg||0).toLocaleString("ru-RU"),
+      esc(x.recovery_code||"—")
+    ])
+  );
+
+  $("wmBalances").innerHTML=table(
+    ["Код отхода","Начало месяца, кг","Конец месяца, кг","Изменение, кг"],
+    balances.map(x=>{
+      const o=Number(x.opening_kg||0),cl=Number(x.closing_kg||0);
+      return [
+        esc(x.waste_code),
+        o.toLocaleString("ru-RU"),
+        cl.toLocaleString("ru-RU"),
+        (cl-o).toLocaleString("ru-RU")
+      ];
+    })
+  );
+};
 
 async function loadWarehouse(){
   const [
