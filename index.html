@@ -298,7 +298,7 @@ window.invitePortlifUser=async()=>{
 window.loadPortlifUsers=async()=>{
   const {data,error}=await db.functions.invoke("portlif-users",{body:{action:"list"}});
   if(error||data?.error){$("usersTable").innerHTML='<div class="empty">'+esc(data?.error||error?.message||"Ошибка")+'</div>';return}
-  const labels={owner:"Владелец",manager:"Руководитель",qhse:"QHSE",logistics:"Логистика",accounting:"Бухгалтерия",employee:"Сотрудник",auditor:"Аудитор"};
+  const labels={owner:"Руководитель",manager:"Руководитель",qhse:"QHSE",logistics:"Логистика",accounting:"Бухгалтерия",employee:"Сотрудник",auditor:"Аудитор"};
   $("usersTable").innerHTML=table(["Сотрудник","Роль","Доступ"],(data.users||[]).map(x=>[
     esc(x.full_name||x.user_id),esc(labels[x.role]||x.role),x.active?"Активен":"Отключён"
   ]));
