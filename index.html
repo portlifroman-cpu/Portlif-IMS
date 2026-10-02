@@ -33,7 +33,6 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <label>Email</label><input id="email" class="field" type="email" autocomplete="email" value="roman@portlif.ee">
 <label>Пароль</label><input id="password" class="field" type="password" autocomplete="current-password" autofocus placeholder="Введите пароль">
 <button id="authBtn" class="btn primary full">Войти</button>
-<button id="employeeSignupBtn" class="btn soft full">Первый вход сотрудника</button>
 <button id="recoverBtn" class="btn soft full" style="border:0;background:transparent">Забыли пароль?</button>
 <div id="authMsg" class="msg"></div>
 </div></section>
@@ -50,6 +49,25 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <section id="home" class="section active">
 <div class="grid"><div class="stat"><span>Контрагенты</span><b id="kClients">0</b></div><div class="stat"><span>Активные партии</span><b id="kLots">0</b></div><div class="stat"><span>Перевозки</span><b id="kShip">0</b></div><div class="stat"><span>Открытые CAPA</span><b id="kCapa">0</b></div></div>
 <div class="panel"><h3>Направления Portlif</h3><div id="services" class="formgrid"></div></div>
+
+<div id="userAdminPanel" class="panel hidden">
+  <div class="toolbar"><h3>Сотрудники</h3><span class="muted">Вход только по приглашению</span></div>
+  <div class="formgrid">
+    <div><label>Email сотрудника</label><input id="inviteEmail" class="field" type="email" placeholder="name@portlif.ee"></div>
+    <div><label>Имя</label><input id="inviteName" class="field" placeholder="Имя сотрудника"></div>
+    <div><label>Роль</label><select id="inviteRole" class="field">
+      <option value="employee">Сотрудник</option>
+      <option value="logistics">Логистика</option>
+      <option value="qhse">QHSE</option>
+      <option value="accounting">Бухгалтерия</option>
+      <option value="auditor">Аудитор</option>
+      <option value="manager">Руководитель</option>
+    </select></div>
+  </div>
+  <div class="actions"><button class="btn primary" onclick="invitePortlifUser()">Отправить приглашение</button></div>
+  <div id="inviteMsg" class="msg"></div>
+  <div id="usersTable" class="tablewrap"></div>
+</div>
 </section>
 
 <section id="clients" class="section">
@@ -250,27 +268,42 @@ async function ensureMembership(){
    const ins=await db.from("portlif_memberships").insert({user_id:user.id,full_name:user.email,role:"owner",active:true}).select().single();
    if(ins.error)throw new Error("Не удалось назначить доступ владельца: "+ins.error.message); return ins.data;
  }
- const {data:invite,error:inviteErr}=await db.from("portlif_invited_users").select("full_name,role,active").eq("email",email).maybeSingle();
- if(inviteErr)throw inviteErr;
- if(!invite?.active)throw new Error("Учётная запись существует, но доступ к Portlif IMS ещё не назначен руководителем.");
- const ins=await db.from("portlif_memberships").insert({user_id:user.id,full_name:invite.full_name||user.email,role:invite.role,active:true}).select().single();
- if(ins.error)throw new Error("Не удалось активировать доступ: "+ins.error.message); return ins.data;
+ throw new Error("Для этой учётной записи нет приглашения в Portlif IMS.");
 }
 async function boot(){
  const {data:{user:u}}=await db.auth.getUser(); user=u; if(!user)return;
- try{membership=await ensureMembership();$("userEmail").textContent=user.email||"";$("roleBadge").textContent=membership.role.toUpperCase();$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");await refreshAll()}
+ try{membership=await ensureMembership();$("userEmail").textContent=user.email||"";$("roleBadge").textContent=membership.role.toUpperCase();$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");if(["owner","manager"].includes(membership.role)){$("userAdminPanel").classList.remove("hidden");await loadPortlifUsers()}await refreshAll()}
  catch(e){await db.auth.signOut();msg(e.message)}
 }
 $("authBtn").onclick=async()=>{const email=$("email").value.trim().toLowerCase(),password=$("password").value;if(!email)return msg("Введите email.");if(password.length<8)return msg("Введите пароль не короче 8 символов.");const {error}=await db.auth.signInWithPassword({email,password});if(error)return msg("Ошибка входа: "+error.message);await boot()};
 $("password").addEventListener("keydown",e=>{if(e.key==="Enter")$("authBtn").click()});
-$("employeeSignupBtn").onclick=async()=>{
-  const email=$("email").value.trim().toLowerCase(),password=$("password").value;
-  if(!email)return msg("Введите email.");
-  if(password.length<8)return msg("Пароль должен содержать минимум 8 символов.");
-  const {data,error}=await db.auth.signUp({email,password,options:{emailRedirectTo:location.origin+"/"}});
-  if(error)return msg("Не удалось создать вход: "+error.message);
-  if(data.session){await boot()}else msg("Первый вход создан. Откройте письмо подтверждения и затем войдите.",true);
+
+window.invitePortlifUser=async()=>{
+  const email=$("inviteEmail").value.trim().toLowerCase();
+  const full_name=$("inviteName").value.trim();
+  const role=$("inviteRole").value;
+  const m=$("inviteMsg"); m.className="msg err"; m.textContent="";
+  if(!email||!email.includes("@")){m.textContent="Введите email сотрудника.";return}
+  const {data,error}=await db.functions.invoke("portlif-users",{body:{
+    action:"invite",email,full_name,role,
+    redirect_to:location.origin+"/?invite=1"
+  }});
+  if(error){m.textContent="Не удалось отправить приглашение: "+error.message;return}
+  if(data?.error){m.textContent="Не удалось отправить приглашение: "+data.error;return}
+  m.className="msg ok";m.textContent="Приглашение отправлено на "+email+".";
+  $("inviteEmail").value="";$("inviteName").value="";
+  await loadPortlifUsers();
 };
+
+window.loadPortlifUsers=async()=>{
+  const {data,error}=await db.functions.invoke("portlif-users",{body:{action:"list"}});
+  if(error||data?.error){$("usersTable").innerHTML='<div class="empty">'+esc(data?.error||error?.message||"Ошибка")+'</div>';return}
+  const labels={owner:"Владелец",manager:"Руководитель",qhse:"QHSE",logistics:"Логистика",accounting:"Бухгалтерия",employee:"Сотрудник",auditor:"Аудитор"};
+  $("usersTable").innerHTML=table(["Сотрудник","Роль","Доступ"],(data.users||[]).map(x=>[
+    esc(x.full_name||x.user_id),esc(labels[x.role]||x.role),x.active?"Активен":"Отключён"
+  ]));
+};
+
 $("recoverBtn").onclick=async()=>{const email=$("email").value.trim().toLowerCase();if(!email)return msg("Введите email.");const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:location.origin+"/"});msg(error?error.message:"Ссылка для нового пароля отправлена на "+email+".",!error)};
 $("logoutBtn").onclick=async()=>{await db.auth.signOut();location.reload()};
 
@@ -285,12 +318,14 @@ $("saveNewPassword").onclick=async()=>{
   if(error && error.code!=="same_password"){m.textContent="Не удалось изменить пароль: "+error.message;return}
   m.className="msg ok";
   m.textContent=error?.code==="same_password"?"Этот пароль уже установлен. Открываю Portlif IMS.":"Пароль изменён. Сейчас откроется Portlif IMS.";
-  setTimeout(async()=>{ $("passwordResetModal").classList.add("hidden"); await boot(); },300);
+  setTimeout(async()=>{ $("passwordResetModal").classList.add("hidden");if(new URLSearchParams(location.search).get("invite")==="1")history.replaceState({}, "", location.pathname); await boot(); },300);
 };
 
 db.auth.onAuthStateChange((event,session)=>{
-  if(event==="PASSWORD_RECOVERY" && session){
+  const isInvite=new URLSearchParams(location.search).get("invite")==="1";
+  if((event==="PASSWORD_RECOVERY" || (event==="SIGNED_IN" && isInvite)) && session){
     $("passwordResetModal").classList.remove("hidden");
+    $("authTitle").textContent="Вход в Portlif IMS";
   }
 });
 
@@ -560,7 +595,7 @@ await boot();
 <div id="passwordResetModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;z-index:9999;padding:20px">
   <div class="card" style="width:min(440px,100%)">
     <h2 style="margin-top:0">Новый пароль</h2>
-    <div class="muted">Введите новый пароль для roman@portlif.ee.</div>
+    <div class="muted">Задайте пароль для этой учётной записи.</div>
     <label>Новый пароль</label>
     <input id="newPassword1" class="field" type="password" autocomplete="new-password" placeholder="Минимум 8 символов">
     <label>Повторите пароль</label>
