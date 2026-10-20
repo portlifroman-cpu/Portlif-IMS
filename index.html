@@ -41,7 +41,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <div id="appView" class="shell hidden">
 <aside class="side"><div class="logo"><div class="mark"><img src="/portlif-logo.svg" alt="Portlif Grupp OÜ"></div><div><b>PORTLIF IMS</b><div style="opacity:.65;font-size:12px">Portlif Grupp OÜ</div></div></div>
 <div class="nav">
-<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="wasteMovement">Движение отходов</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button>
+<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="wasteMovement">Движение отходов</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button><button data-page="pyrolysis">Пиролизная установка</button>
 </div></aside>
 <main class="main">
 <div class="top"><div><span class="badge" id="roleBadge">PORTLIF</span><h1 id="pageTitle">Главная</h1></div><div><span id="userEmail" class="muted"></span> <button id="logoutBtn" class="btn soft">Выйти</button></div></div>
@@ -274,6 +274,39 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 
 <section id="equipment" class="section"><div class="panel"><div class="toolbar"><h3>Оборудование</h3><button class="btn primary" onclick="toggle('eqForm')">+ Оборудование</button></div>
 <div id="eqForm" class="hidden"><div class="formgrid"><div><label>Наименование</label><input id="eName" class="field"></div><div><label>Модель</label><input id="eModel" class="field"></div><div><label>Серийный №</label><input id="eSerial" class="field"></div><div><label>Место</label><input id="eLocation" class="field"></div><div><label>Следующее ТО</label><input id="eService" type="date" class="field"></div><div><label>Критичное</label><select id="eCritical" class="field"><option value="false">Нет</option><option value="true">Да</option></select></div></div><div class="actions"><button class="btn primary" onclick="saveEquipment()">Сохранить</button></div></div><div id="eqTable" class="tablewrap"></div></div></section>
+<section id="pyrolysis" class="section">
+<div class="panel">
+<div class="toolbar"><h3>Пиролизная установка · Журнал циклов</h3><button class="btn primary" onclick="toggle('pyroForm')">+ Новый цикл</button></div>
+<p class="muted">Реактор 40 м³ · максимальная рабочая температура по проекту 400 °C. Ввод данных вручную, без управления оборудованием.</p>
+<div class="grid">
+<div class="stat"><span>Переработано всего</span><b id="pyroInputTotal">0 т</b></div>
+<div class="stat"><span>Получено масла</span><b id="pyroOilTotal">0 т</b></div>
+<div class="stat"><span>Выход масла</span><b id="pyroYield">0 %</b></div>
+<div class="stat"><span>Электроэнергия</span><b id="pyroEnergyTotal">0 кВт·ч</b></div>
+</div>
+<div id="pyroForm" class="hidden">
+<h3>Запись производственного цикла</h3>
+<div class="formgrid">
+<div><label>Дата</label><input id="pyDate" class="field" type="date"></div>
+<div><label>Номер партии / цикла</label><input id="pyBatch" class="field" placeholder="Например, PY-001"></div>
+<div><label>Оператор</label><input id="pyOperator" class="field"></div>
+<div><label>Вид сырья</label><input id="pyRaw" class="field" placeholder="Нефтешлам / нефтяные отходы"></div>
+<div><label>Резервуар-источник</label><select id="pyTank" class="field"><option value="">—</option><option>M1</option><option>M2</option><option>M3</option><option>M4</option><option>M5</option><option>M6</option><option>M7</option><option>Другое</option></select></div>
+<div><label>Загрузка, т</label><input id="pyInput" class="field" type="number" min="0" step="0.001"></div>
+<div><label>Температура, °C</label><input id="pyTemp" class="field" type="number" min="0" max="400" step="1"></div>
+<div><label>Длительность, ч</label><input id="pyHours" class="field" type="number" min="0" step="0.1"></div>
+<div><label>Получено масла, т</label><input id="pyOil" class="field" type="number" min="0" step="0.001"></div>
+<div><label>Вода, т</label><input id="pyWater" class="field" type="number" min="0" step="0.001"></div>
+<div><label>Твёрдый остаток, т</label><input id="pyResidue" class="field" type="number" min="0" step="0.001"></div>
+<div><label>Электроэнергия, кВт·ч</label><input id="pyEnergy" class="field" type="number" min="0" step="0.01"></div>
+<div class="span2"><label>Примечание</label><input id="pyNotes" class="field" placeholder="Особенности цикла, проблемы, наблюдения"></div>
+</div>
+<div class="actions"><button class="btn primary" onclick="savePyroCycle()">Сохранить цикл</button><button class="btn soft" onclick="toggle('pyroForm')">Отмена</button></div>
+<div class="muted" id="pyroMessage" role="status"></div>
+</div>
+<div id="pyroTable" class="tablewrap"></div>
+</div>
+</section>
 </main></div>
 
 <script type="module">
@@ -373,7 +406,7 @@ async function count(t,notClosed){let q=db.from(t).select("*",{count:"exact",hea
 async function refreshAll(){
  const [clients,lots,ship,capa,risks,inc,aud]=await Promise.all([count("portlif_counterparties"),count("portlif_lots","closed"),count("portlif_shipments","cancelled"),count("portlif_capa","closed"),count("portlif_risks"),count("portlif_incidents"),count("portlif_audits")]);
  $("kClients").textContent=clients;$("kLots").textContent=lots;$("kShip").textContent=ship;$("kCapa").textContent=capa;$("isoRisks").textContent=risks;$("isoIncidents").textContent=inc;$("isoCapa").textContent=capa;$("isoAudits").textContent=aud;
- await Promise.all([loadServices(),loadClients(),loadLots(),loadShipments(),loadLab(),loadRisks(),loadDocs(),loadWasteMovement(),loadWarehouse(),loadEquipment()]);
+ await Promise.all([loadServices(),loadClients(),loadLots(),loadShipments(),loadLab(),loadRisks(),loadDocs(),loadWasteMovement(),loadWarehouse(),loadEquipment(),loadPyroCycles()]);
 }
 async function loadServices(){const {data=[]}=await db.from("portlif_service_catalog").select("*").eq("active",true).order("sort_order");$("services").innerHTML=data.map(x=>'<div class="card"><b>'+esc(x.name_ru)+'</b><div class="muted" style="margin-top:5px">'+esc(x.description_ru||"")+'</div></div>').join("")}
 async function loadClients(){const {data=[]}=await db.from("portlif_counterparties").select("*").order("name");$("clientsTable").innerHTML=table(["Название","Тип","Страна","Контакт","Email"],data.map(x=>[esc(x.name),esc(x.kind),esc(x.country||"—"),esc(x.contact_name||x.phone||"—"),esc(x.email||"—")]))}
@@ -681,6 +714,33 @@ window.saveWarehouseStock=async()=>{
 async function loadEquipment(){const {data=[]}=await db.from("portlif_equipment").select("*").order("name");$("eqTable").innerHTML=table(["Оборудование","Модель","Серийный №","Место","Следующее ТО","Критичное","Статус"],data.map(x=>[esc(x.name),esc(x.model||"—"),esc(x.serial_no||"—"),esc(x.location||"—"),x.next_service_date||"—",x.critical?"Да":"Нет",esc(x.status)]))}
 window.saveEquipment=async()=>{const row={name:$("eName").value.trim(),model:$("eModel").value.trim()||null,serial_no:$("eSerial").value.trim()||null,location:$("eLocation").value.trim()||null,next_service_date:$("eService").value||null,critical:$("eCritical").value==="true",status:"active"};if(!row.name)return alert("Введите наименование");const {error}=await db.from("portlif_equipment").insert(row);if(error)return alert(error.message);toggle("eqForm");await refreshAll()};
 await boot();
+
+const pyroNumber=v=>Number(v||0);
+const pyroFmt=(v,d=2)=>Number(v||0).toLocaleString("ru-RU",{maximumFractionDigits:d});
+window.savePyroCycle=async()=>{
+ const get=id=>$(id).value.trim(), n=id=>get(id)===""?0:Number(get(id));
+ const input=n("pyInput"),oil=n("pyOil"),water=n("pyWater"),residue=n("pyResidue");
+ if(!get("pyDate")||!input||input<=0){$("pyroMessage").textContent="Укажите дату и загрузку больше нуля";return}
+ if([oil,water,residue,n("pyEnergy"),n("pyHours")].some(x=>!Number.isFinite(x)||x<0)||oil+water+residue>input+0.0000001){$("pyroMessage").textContent="Проверьте количества: сумма выходов не может превышать загрузку";return}
+ if(get("pyTemp") && (n("pyTemp")<0||n("pyTemp")>400)){$("pyroMessage").textContent="Укажите температуру от 0 до 400 °C";return}
+ const row={cycle_date:get("pyDate"),batch_code:get("pyBatch")||null,operator_name:get("pyOperator")||null,raw_material:get("pyRaw")||null,source_tank:get("pyTank")||null,input_tonnes:input,temperature_c:get("pyTemp")?n("pyTemp"):null,duration_hours:get("pyHours")?n("pyHours"):null,oil_tonnes:oil,water_tonnes:water,residue_tonnes:residue,energy_kwh:get("pyEnergy")?n("pyEnergy"):null,notes:get("pyNotes")||null,created_by:user.id};
+ $("pyroMessage").textContent="Сохраняем...";
+ const {error}=await db.from("portlif_pyrolysis_cycles").insert(row);
+ if(error){$("pyroMessage").textContent="Не удалось сохранить: "+error.message;return}
+ $("pyroMessage").textContent="Цикл сохранён";
+ ["pyBatch","pyOperator","pyRaw","pyInput","pyTemp","pyHours","pyOil","pyWater","pyResidue","pyEnergy","pyNotes"].forEach(id=>$(id).value="");
+ $("pyroForm").classList.add("hidden");
+ await loadPyroCycles();
+};
+async function loadPyroCycles(){
+ const {data,error}=await db.from("portlif_pyrolysis_cycles").select("*").order("cycle_date",{ascending:false}).order("created_at",{ascending:false}).limit(300);
+ if(error){$("pyroTable").textContent="Ошибка загрузки циклов: "+error.message;return}
+ const rows=data||[],total=rows.reduce((a,r)=>a+pyroNumber(r.input_tonnes),0),oil=rows.reduce((a,r)=>a+pyroNumber(r.oil_tonnes),0),energy=rows.reduce((a,r)=>a+pyroNumber(r.energy_kwh),0);
+ $("pyroInputTotal").textContent=pyroFmt(total,3)+" т";$("pyroOilTotal").textContent=pyroFmt(oil,3)+" т";$("pyroYield").textContent=total?pyroFmt(oil/total*100,1)+" %":"0 %";$("pyroEnergyTotal").textContent=pyroFmt(energy,1)+" кВт·ч";
+ $("pyroTable").innerHTML=table(["Дата","Цикл","Сырьё / резервуар","Загрузка, т","Масло, т","Вода, т","Остаток, т","Неучтённое, т","Выход масла","t °C","кВт·ч","Оператор"],rows.map(r=>[esc(r.cycle_date),esc(r.batch_code||"—"),esc([r.raw_material,r.source_tank].filter(Boolean).join(" / ")||"—"),pyroFmt(r.input_tonnes,3),pyroFmt(r.oil_tonnes,3),pyroFmt(r.water_tonnes,3),pyroFmt(r.residue_tonnes,3),pyroFmt(pyroNumber(r.input_tonnes)-pyroNumber(r.oil_tonnes)-pyroNumber(r.water_tonnes)-pyroNumber(r.residue_tonnes),3),pyroNumber(r.input_tonnes)?pyroFmt(pyroNumber(r.oil_tonnes)/pyroNumber(r.input_tonnes)*100,1)+" %":"—",r.temperature_c==null?"—":pyroFmt(r.temperature_c,1),r.energy_kwh==null?"—":pyroFmt(r.energy_kwh,1),esc(r.operator_name||"—")]));
+}
+$("pyDate").value=new Date().toLocaleDateString("en-CA");
+
 </script>
 
 <div id="passwordResetModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;z-index:9999;padding:20px">
