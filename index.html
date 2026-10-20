@@ -18,6 +18,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 .formgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.span2{grid-column:span 2}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.empty{padding:20px 0;color:var(--muted)}.tankgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}.tankcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}.tankhead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.tankcode{font-size:12px;font-weight:800;color:var(--brand);background:#e7f4f6;border-radius:999px;padding:4px 8px}.tankqty{font-size:26px;font-weight:850;margin:10px 0 4px}.tankbar{height:10px;border-radius:999px;background:#e8eef0;overflow:hidden;margin:10px 0}.tankfill{height:100%;background:var(--brand);border-radius:999px}.tankmeta{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:var(--muted)}.clickable{cursor:pointer}.clickable:hover{outline:2px solid #c8e8ed}@media(max-width:980px){.tankgrid{grid-template-columns:repeat(2,1fr)}}@media(max-width:620px){.tankgrid{grid-template-columns:1fr}}
 @media(max-width:980px){.shell{grid-template-columns:1fr}.side{position:static;height:auto}.nav{grid-template-columns:repeat(4,1fr)}.grid{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.hero{display:none}.login{grid-template-columns:1fr}.auth{min-height:100vh}.main{padding:16px}.nav{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}.span2{grid-column:auto}.top{align-items:flex-start;flex-direction:column}}
+.py-tabs{display:flex;gap:7px;flex-wrap:wrap;margin:16px 0}.py-tabs button{border:1px solid var(--line);background:#fff;color:var(--ink);padding:11px 14px;border-radius:10px;font-weight:700;cursor:pointer}.py-tabs button.active{background:var(--brand);color:white;border-color:var(--brand)}.py-tab-panel{display:none}.py-tab-panel.active{display:block}.py-photo{min-height:180px;background:linear-gradient(135deg,#e7f0f2,#dbe8eb);border:2px dashed #acc2ca;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:7px;text-align:center;margin:16px 0;padding:18px}.py-photo-icon{font-size:48px}.py-photo small{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -276,7 +277,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <div id="eqForm" class="hidden"><div class="formgrid"><div><label>Наименование</label><input id="eName" class="field"></div><div><label>Модель</label><input id="eModel" class="field"></div><div><label>Серийный №</label><input id="eSerial" class="field"></div><div><label>Место</label><input id="eLocation" class="field"></div><div><label>Следующее ТО</label><input id="eService" type="date" class="field"></div><div><label>Критичное</label><select id="eCritical" class="field"><option value="false">Нет</option><option value="true">Да</option></select></div></div><div class="actions"><button class="btn primary" onclick="saveEquipment()">Сохранить</button></div></div><div id="eqTable" class="tablewrap"></div></div></section>
 <section id="pyrolysis" class="section">
 <div class="panel">
-<div class="toolbar"><h3>Пиролизная установка · Журнал циклов</h3><button class="btn primary" onclick="toggle('pyroForm')">+ Новый цикл</button></div>
+<div class="toolbar"><h3>Пиролизная установка · Журнал циклов</h3><button class="btn primary" onclick="showPyroTab('journal');toggle('pyroForm')">+ Новый цикл</button></div>
 <p class="muted">Реактор 40 м³ · максимальная рабочая температура по проекту 400 °C. Ввод данных вручную, без управления оборудованием.</p>
 <div class="grid">
 <div class="stat"><span>Переработано всего</span><b id="pyroInputTotal">0 т</b></div>
@@ -284,55 +285,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <div class="stat"><span>Выход масла</span><b id="pyroYield">0 %</b></div>
 <div class="stat"><span>Электроэнергия</span><b id="pyroEnergyTotal">0 кВт·ч</b></div>
 </div>
-<div class="panel" style="margin-top:16px">
-<h3>Описание пиролизной установки</h3>
-<p>Промышленная установка термической переработки нефтесодержащих отходов Portlif Grupp OÜ. Сырьё нагревается в реакторе в условиях ограниченного доступа кислорода; образующиеся пары и газы должны направляться через предусмотренные проектом системы отвода, конденсации, очистки и безопасной утилизации. Жидкие продукты, вода и твёрдый остаток подлежат отдельному учёту.</p>
-<div class="formgrid">
-<div><b>Объём реактора</b><p>40 м³ (по имеющимся сведениям)</p></div>
-<div><b>Нагрев</b><p>До 400 °C (заявленный предел, не разрешение на любой режим)</p></div>
-<div><b>Назначение</b><p>Нефтешламы, нефтесодержащие отходы после проверки состава и пригодности</p></div>
-<div><b>Учёт</b><p>Дата, партия, сырьё, загрузка, температура, длительность, продукты и энергия</p></div>
-</div>
-<p class="muted"><b>Важно:</b> модель, паспортные давление и производительность, тип нагревателя, P&amp;ID, газоочистка, защитные блокировки и точные технологические режимы пока документально не подтверждены. Их необходимо внести по паспорту и проектной документации; эта страница не является инструкцией по пуску.</p>
-</div>
-<div class="panel" style="margin-top:16px">
-<h3>Техника безопасности · памятка для персонала</h3>
-<p><b>Статус:</b> проект общей памятки. Перед применением утвердить с ответственным за промышленную безопасность с учётом оценки рисков, инструкции производителя, ATEX и требований Эстонии.</p>
-<h4>Основные опасности</h4>
-<ul><li>Пожар и взрыв при утечке горючих пиролизных газов и паров, подсосе воздуха или неисправности отвода газов.</li><li>Ожоги от горячего реактора, трубопроводов, конденсата и продукта.</li><li>Опасные выбросы, в том числе CO, H₂S и токсичные пары — в зависимости от состава сырья.</li><li>Избыточное давление, отказ автоматики, вентиляции или охлаждения.</li><li>Поражение электротоком и травмы при обслуживании приводов и арматуры.</li></ul>
-<h4>Перед допуском и началом работы</h4>
-<ul><li>Допускать только обученных и назначенных сотрудников; проверить действующую инструкцию, инструктаж и средства индивидуальной защиты.</li><li>Проверить идентификацию партии и результаты оценки сырья; не допускать неизвестные, несовместимые или неразрешённые отходы.</li><li>Проверить исправность предусмотренных проектом вентиляции, газоанализа, контроля давления и температуры, аварийных остановов, пожарной защиты и блокировок.</li><li>Убедиться, что газоотвод, конденсация и утилизация газов готовы, нет утечек и посторонних людей в опасной зоне.</li><li>Не запускать установку при неисправных датчиках, защитах, сигнализации или отсутствии утверждённого порядка работы.</li></ul>
-<h4>Во время процесса</h4>
-<ul><li>Контролировать параметры в пределах утверждённой технологической карты; вести журнал наблюдений и отклонений.</li><li>Не обходить блокировки, не открывать горячие или находящиеся под давлением элементы, не проводить ремонт на работающей установке.</li><li>Не оставлять процесс без требуемого проектом наблюдения; поддерживать исправность пожарных проходов и путей эвакуации.</li></ul>
-<h4>При аварийных признаках</h4>
-<ul><li>При утечке, срабатывании газосигнализации, росте давления/температуры за допустимые пределы, задымлении или отказе охлаждения — действовать по утверждённой аварийной инструкции и безопасной системе останова.</li><li>Не приближаться к месту утечки, не создавать источники воспламенения, вывести людей из опасной зоны и вызвать экстренные службы по установленному плану; в Эстонии экстренный номер 112.</li><li>Не пытаться открывать реактор или сбрасывать давление вручную без предусмотренной проектом процедуры и допуска.</li></ul>
-<h4>Перед ремонтом и очисткой</h4>
-<ul><li>Обеспечить останов, охлаждение, изоляцию и блокировку всех источников энергии (LOTO), проверить отсутствие опасной остаточной энергии.</li><li>Вскрытие, очистка и вход во внутренние объёмы — только по наряду-допуску, после оценки атмосферы и с планом спасения.</li><li>Фиксировать неисправности, происшествия и корректирующие мероприятия в ISO / QHSE.</li></ul>
-<p class="muted">Справочные материалы: <a href="https://www.hse.gov.uk/waste/disposal.htm" target="_blank" rel="noopener noreferrer">HSE — термические процессы с отходами</a>; <a href="https://www.osha.gov/control-hazardous-energy/" target="_blank" rel="noopener noreferrer">OSHA — изоляция энергии при обслуживании</a>. Они не заменяют местные нормы и паспорт.</p>
-</div>
-<div id="pyroForm" class="hidden">
-<h3>Запись производственного цикла</h3>
-<div class="formgrid">
-<div><label>Дата</label><input id="pyDate" class="field" type="date"></div>
-<div><label>Номер партии / цикла</label><input id="pyBatch" class="field" placeholder="Например, PY-001"></div>
-<div><label>Оператор</label><input id="pyOperator" class="field"></div>
-<div><label>Вид сырья</label><input id="pyRaw" class="field" placeholder="Нефтешлам / нефтяные отходы"></div>
-<div><label>Резервуар-источник</label><select id="pyTank" class="field"><option value="">—</option><option>M1</option><option>M2</option><option>M3</option><option>M4</option><option>M5</option><option>M6</option><option>M7</option><option>Другое</option></select></div>
-<div><label>Загрузка, т</label><input id="pyInput" class="field" type="number" min="0" step="0.001"></div>
-<div><label>Температура, °C</label><input id="pyTemp" class="field" type="number" min="0" max="400" step="1"></div>
-<div><label>Длительность, ч</label><input id="pyHours" class="field" type="number" min="0" step="0.1"></div>
-<div><label>Получено масла, т</label><input id="pyOil" class="field" type="number" min="0" step="0.001"></div>
-<div><label>Вода, т</label><input id="pyWater" class="field" type="number" min="0" step="0.001"></div>
-<div><label>Твёрдый остаток, т</label><input id="pyResidue" class="field" type="number" min="0" step="0.001"></div>
-<div><label>Электроэнергия, кВт·ч</label><input id="pyEnergy" class="field" type="number" min="0" step="0.01"></div>
-<div class="span2"><label>Примечание</label><input id="pyNotes" class="field" placeholder="Особенности цикла, проблемы, наблюдения"></div>
-</div>
-<div class="actions"><button class="btn primary" onclick="savePyroCycle()">Сохранить цикл</button><button class="btn soft" onclick="toggle('pyroForm')">Отмена</button></div>
-<div class="muted" id="pyroMessage" role="status"></div>
-</div>
-<div id="pyroTable" class="tablewrap"></div>
-</div>
-</section>
+<div class="py-tabs" role="tablist" aria-label="Разделы пиролизной установки"><button type="button" role="tab" aria-selected="true" class="active" onclick="showPyroTab('overview')">Общий вид</button><button type="button" role="tab" aria-selected="false" class="" onclick="showPyroTab('reactor')">Реактор</button><button type="button" role="tab" aria-selected="false" class="" onclick="showPyroTab('heating')">Нагрев</button><button type="button" role="tab" aria-selected="false" class="" onclick="showPyroTab('condensation')">Конденсация</button><button type="button" role="tab" aria-selected="false" class="" onclick="showPyroTab('safety')">Безопасность</button><button type="button" role="tab" aria-selected="false" class="" onclick="showPyroTab('journal')">Журнал циклов</button></div><div id="py-tab-overview" class="py-tab-panel active" role="tabpanel">undefined</div><div id="py-tab-reactor" class="py-tab-panel" role="tabpanel">undefined</div><div id="py-tab-heating" class="py-tab-panel" role="tabpanel">undefined</div><div id="py-tab-condensation" class="py-tab-panel" role="tabpanel">undefined</div><div id="py-tab-safety" class="py-tab-panel" role="tabpanel">undefined</div><div id="py-tab-journal" class="py-tab-panel" role="tabpanel">undefined</div></section>
 </main></div>
 
 <script type="module">
@@ -741,6 +694,7 @@ async function loadEquipment(){const {data=[]}=await db.from("portlif_equipment"
 window.saveEquipment=async()=>{const row={name:$("eName").value.trim(),model:$("eModel").value.trim()||null,serial_no:$("eSerial").value.trim()||null,location:$("eLocation").value.trim()||null,next_service_date:$("eService").value||null,critical:$("eCritical").value==="true",status:"active"};if(!row.name)return alert("Введите наименование");const {error}=await db.from("portlif_equipment").insert(row);if(error)return alert(error.message);toggle("eqForm");await refreshAll()};
 await boot();
 
+window.showPyroTab=id=>{document.querySelectorAll("#pyrolysis .py-tab-panel").forEach(el=>el.classList.toggle("active",el.id==="py-tab-"+id));document.querySelectorAll("#pyrolysis .py-tabs button").forEach(b=>{const on=b.getAttribute("onclick")?.includes("'"+id+"'");b.classList.toggle("active",!!on);b.setAttribute("aria-selected",on?"true":"false")})};
 const pyroNumber=v=>Number(v||0);
 const pyroFmt=(v,d=2)=>Number(v||0).toLocaleString("ru-RU",{maximumFractionDigits:d});
 window.savePyroCycle=async()=>{
