@@ -281,11 +281,11 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <section id="airReport" class="section">
 <div class="panel">
  <div class="toolbar"><h3>Отчёт по воздуху · учёт выбросов</h3><button class="btn soft" onclick="loadAirReport()">Обновить</button></div>
- <p class="muted">Внутренний журнал инструментальных замеров и расчётных выбросов. Показатели вводятся по протоколам лаборатории и утверждённым расчётам. Не является официальной декларацией и не заменяет экологическое разрешение или отчётность в KOTKAS.</p>
+ <p class="muted">Структура источников и веществ приведена в соответствие с квартальными рабочими книгами Portlif Grupp OÜ «õhuarvutused» за I–III кварталы 2026 года. В CRM ведутся записи расчётов/замеров; оригинальные Excel с взаимосвязанными формулами остаются первичным расчётным шаблоном. Этот экран не воспроизводит все формулы 14 листов и не заменяет официальную отчётность KOTKAS.</p>
  <div class="formgrid">
  <div><label>Дата замера / расчёта</label><input id="airDate" type="date" class="field"></div>
- <div><label>Источник выброса</label><input id="airSource" class="field" placeholder="Например: дымовая труба установки"></div>
- <div><label>Загрязняющее вещество</label><select id="airPollutant" class="field"><option>CO</option><option>NOx</option><option>SO₂</option><option>Пыль / PM</option><option>ЛОС / VOC</option><option>H₂S</option><option>CO₂</option><option>Другое (указать в примечании)</option></select></div>
+ <div><label>Источник выброса</label><select id="airSource" class="field"><option value="">Выберите источник по согласованной таблице</option><option>SA-1 — Katlamaja korsten</option><option>SA-2 — Aurustite põletid</option><option>SA-3 — Destillatsiooniseadme reaktorite soojendamise põleti</option><option>V-1 — Pumbamaja nr 1 ventilatsiooniavade koondallikas</option><option>V-2 — Labori ventilatsiooniavade koondallikas</option><option>V-3 — Pumbamaja nr 2 ventilatsiooniavade koondallikas</option><option>V-4 — Trikanteri ventilatsiooniava</option><option>V-5 — Pumbamaja nr 3 ja destillatsioonihoone ventilatsioon</option><option>M-1 — Mahuti</option><option>M-2 — Mahuti</option><option>M-3 — Mahuti</option><option>M-4 — Mahuti</option><option>M-5 — Mahuti</option></select></div>
+ <div><label>Загрязняющее вещество</label><select id="airPollutant" class="field"><option>SO2</option><option>NO2</option><option>CO</option><option>NMVOC</option><option>PM-sum</option><option>PM10</option><option>PM2,5</option><option>Pb</option><option>Cd</option><option>Hg</option><option>As</option><option>Cr</option><option>Cu</option><option>Ni</option><option>Zn</option><option>CO2</option><option>PCDD/PCDF</option><option>Benso(a)püreen</option><option>Benso(b)fluoranteen</option><option>Benso(k)fluoranteen</option><option>Indeno(1,2,2-cd)püreen</option><option>H2S</option><option>Merkaptaanid</option><option>Aromaatsed süsivesinikud</option><option>Lõhn</option></select></div>
  <div><label>Тип данных</label><select id="airType" class="field"><option value="measurement">Лабораторный замер</option><option value="calculated">Расчёт</option></select></div>
  <div><label>Концентрация, мг/Нм³</label><input id="airConcentration" class="field" type="number" min="0" step="any" placeholder="При наличии"></div>
  <div><label>Расход газа, Нм³/ч</label><input id="airFlow" class="field" type="number" min="0" step="any" placeholder="При наличии"></div>
@@ -299,10 +299,10 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
  <p class="muted">Автоматический расчёт массы: мг/Нм³ × Нм³/ч × часы ÷ 1 000 000 = кг. Использовать только при согласованных условиях приведения концентрации и расхода, одной методике и репрезентативном периоде. Раздельно указывайте расчётные и измеренные данные.</p>
 </div>
 <div class="panel">
- <div class="toolbar"><h3>Журнал и выгрузка</h3><button class="btn soft" onclick="downloadAirReport()">Скачать CSV</button></div>
- <div class="formgrid"><div><label>Месяц</label><input id="airMonth" type="month" class="field"></div><div><label>Выборка</label><button class="btn soft" onclick="loadAirReport()">Сформировать отчёт</button></div></div>
+ <div class="toolbar"><h3>Квартальная ведомость по источникам</h3><button class="btn soft" onclick="downloadAirReport()">Скачать CSV</button></div>
+ <div class="formgrid"><div><label>Квартал</label><select id="airQuarter" class="field"><option value="2026-1">2026 · I квартал</option><option value="2026-2">2026 · II квартал</option><option value="2026-3">2026 · III квартал</option><option value="2026-4">2026 · IV квартал</option></select></div><div><label>Выборка</label><button class="btn soft" onclick="loadAirReport()">Сформировать отчёт</button></div></div>
  <div id="airSummary" class="muted"></div><div class="tablewrap" id="airTable"></div>
- <p class="muted">Для официальной отчётности дополнительно требуются перечень разрешённых источников, вещества и коды по экологическому разрешению, методики, единицы, календарная инвентаризация и проверка ответственным специалистом.</p>
+ <p class="muted">В исходной Excel-методике используются разные единицы (г/с, т/год, кг/год, мг/год, OU/с). Массы в этой форме показаны в кг за выбранный период и не приравниваются автоматически к итогам исходной методики. Для юридически значимого отчёта используйте проверенный расчёт в оригинальной книге и экологическое разрешение KKL/320411.</p>
 </div>
 </section>
 <section id="pyrolysis" class="section">
@@ -890,29 +890,31 @@ window.saveAirRecord=async()=>{
  const row={measured_at:date,source_name:source,pollutant,measurement_type:type,concentration_mg_m3:concentration,flow_nm3_h:flow,operating_hours:hours,emission_kg:derived,protocol_no:airField("airProtocol").value.trim()||null,laboratory:airField("airLaboratory").value.trim()||null,notes:airField("airNotes").value.trim()||null};
  const {error}=await db.from("portlif_air_monitoring").insert(row);
  if(error){msg.textContent="Ошибка: "+error.message;return}
- msg.textContent="Запись сохранена";airField("airMonth").value=date.slice(0,7);await loadAirReport();
+ msg.textContent="Запись сохранена";airField("airQuarter").value=date.slice(0,4)+"-"+(Math.floor((Number(date.slice(5,7))-1)/3)+1);await loadAirReport();
 };
 window.loadAirReport=async()=>{
- const month=airField("airMonth").value||new Date().toISOString().slice(0,7);
- const from=month+"-01", to=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),1)).toISOString().slice(0,10);
+ const q=airField("airQuarter").value||"2026-3";
+ const [year,quarter]=q.split("-").map(Number);
+ const from=year+"-"+String((quarter-1)*3+1).padStart(2,"0")+"-01";
+ const to=new Date(Date.UTC(year,quarter*3,1)).toISOString().slice(0,10);
  const {data,error}=await db.from("portlif_air_monitoring").select("*").gte("measured_at",from).lt("measured_at",to).order("measured_at",{ascending:false}).limit(1000);
  if(error){airField("airSummary").textContent="Ошибка загрузки: "+error.message;return}
  airRows=data||[];
  const totals={};for(const r of airRows)if(r.emission_kg!==null){totals[r.pollutant]=(totals[r.pollutant]||0)+Number(r.emission_kg)}
- airField("airSummary").textContent="Записей: "+airRows.length+". Масса по веществам (кг): "+(Object.entries(totals).map(([k,v])=>k+" — "+airSafeNumber(v)).join("; ")||"нет данных");
+ airField("airSummary").textContent="Записей в квартале: "+airRows.length+". Масса по веществам (кг): "+(Object.entries(totals).map(([k,v])=>k+" — "+airSafeNumber(v)).join("; ")||"нет данных");
  airField("airTable").innerHTML=table(["Дата","Источник","Вещество","Тип","мг/Нм³","Нм³/ч","ч","кг","Протокол","Лаборатория","Примечание"],airRows.map(r=>[esc(r.measured_at),esc(r.source_name),esc(r.pollutant),r.measurement_type==="measurement"?"Замер":"Расчёт",airSafeNumber(r.concentration_mg_m3),airSafeNumber(r.flow_nm3_h),airSafeNumber(r.operating_hours),airSafeNumber(r.emission_kg),esc(r.protocol_no||"—"),esc(r.laboratory||"—"),esc(r.notes||"—")]));
 };
 window.downloadAirReport=()=>{
- if(!airRows.length){airField("airSummary").textContent="Нет записей за выбранный месяц";return}
+ if(!airRows.length){airField("airSummary").textContent="Нет записей за выбранный квартал";return}
  const cols=["Дата","Источник","Вещество","Тип","Концентрация мг/Нм3","Расход Нм3/ч","Часы","Выброс кг","Протокол","Лаборатория","Примечание"];
  const values=airRows.map(r=>[r.measured_at,r.source_name,r.pollutant,r.measurement_type,r.concentration_mg_m3,r.flow_nm3_h,r.operating_hours,r.emission_kg,r.protocol_no,r.laboratory,r.notes]);
  const cell=x=>'"'+String(x??"").replace(/"/g,'""')+'"';
  const csv="\uFEFF"+[cols,...values].map(row=>row.map(cell).join(";")).join("\r\n");
  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
- a.href=url;a.download="portlif_air_report_"+airField("airMonth").value+".csv";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ a.href=url;a.download="portlif_air_report_"+airField("airQuarter").value+".csv";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
 airField("airDate").value=new Date().toLocaleDateString("en-CA");
-airField("airMonth").value=new Date().toLocaleDateString("en-CA").slice(0,7);
+airField("airQuarter").value=new Date().getFullYear()+"-"+(Math.floor(new Date().getMonth()/3)+1);
 
 </script>
 
