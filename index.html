@@ -45,7 +45,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <div id="appView" class="shell hidden">
 <aside class="side"><div class="logo"><div class="mark"><img src="/portlif-logo.svg" alt="Portlif Grupp OÜ"></div><div><b>PORTLIF IMS</b><div style="opacity:.65;font-size:12px">Portlif Grupp OÜ</div></div></div>
 <div class="nav">
-<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="wasteMovement">Движение отходов</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button><button data-page="pyrolysis">Пиролизная установка</button><button data-page="airReport">Отчёт по воздуху</button>
+<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="wasteMovement">Движение отходов</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button><button data-page="pyrolysis">Пиролизная установка</button><button data-page="airReport">Отчёт по воздуху</button><button data-page="airWorkbook">Расчётная Excel-таблица</button>
 </div></aside>
 <main class="main">
 <div class="top"><div><span class="badge" id="roleBadge">PORTLIF</span><h1 id="pageTitle">Главная</h1></div><div><span id="userEmail" class="muted"></span> <button id="logoutBtn" class="btn soft">Выйти</button></div></div>
@@ -278,6 +278,20 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 
 <section id="equipment" class="section"><div class="panel"><div class="toolbar"><h3>Оборудование</h3><button class="btn primary" onclick="toggle('eqForm')">+ Оборудование</button></div>
 <div id="eqForm" class="hidden"><div class="formgrid"><div><label>Наименование</label><input id="eName" class="field"></div><div><label>Модель</label><input id="eModel" class="field"></div><div><label>Серийный №</label><input id="eSerial" class="field"></div><div><label>Место</label><input id="eLocation" class="field"></div><div><label>Следующее ТО</label><input id="eService" type="date" class="field"></div><div><label>Критичное</label><select id="eCritical" class="field"><option value="false">Нет</option><option value="true">Да</option></select></div></div><div class="actions"><button class="btn primary" onclick="saveEquipment()">Сохранить</button></div></div><div id="eqTable" class="tablewrap"></div></div></section>
+<section id="airWorkbook" class="section">
+<div class="panel">
+  <div class="toolbar"><h3>Расчётная таблица выбросов · õhuarvutused</h3></div>
+  <p class="muted">Откройте оригинальный Excel за I, II или III квартал 2026. Серым отмечаются числовые входные ячейки без формул. Ячейки с формулами защищены от редактирования. После изменения сохраните копию XLSX — Microsoft Excel пересчитает формулы при открытии файла.</p>
+  <div class="formgrid">
+    <div><label>Загрузить квартальный файл XLSX</label><input id="airBookFile" class="field" type="file" accept=".xlsx" onchange="openAirWorkbook(event)"></div>
+    <div><label>Лист расчёта</label><select id="airBookSheet" class="field" onchange="drawAirWorkbook()"></select></div>
+  </div>
+  <div class="actions"><button class="btn primary" onclick="saveAirWorkbook()" id="airBookSave" disabled>Сохранить изменённый XLSX</button><button class="btn soft" onclick="drawAirWorkbook()">Обновить таблицу</button></div>
+  <p class="muted" id="airBookInfo">Excel ещё не загружен. Изменения делаются только в текущем открытом файле; исходный файл не перезаписывается.</p>
+  <div id="airBookGrid" style="overflow:auto;max-height:65vh;border:1px solid #d3dce3;border-radius:10px"></div>
+  <p class="muted">Предупреждение: цвет исходных ячеек и заполнение могут различаться между листами. Входные значения отображаются серым только для чисел без формул; текст, ссылки и расчётные ячейки защищены. Для официального отчёта проверяйте результат в Excel по согласованной методике.</p>
+</div>
+</section>
 <section id="airReport" class="section">
 <div class="panel">
  <div class="toolbar"><h3>Отчёт по воздуху · учёт выбросов</h3><button class="btn soft" onclick="loadAirReport()">Обновить</button></div>
@@ -915,6 +929,95 @@ window.downloadAirReport=()=>{
 };
 airField("airDate").value=new Date().toLocaleDateString("en-CA");
 airField("airQuarter").value=new Date().getFullYear()+"-"+(Math.floor(new Date().getMonth()/3)+1);
+
+
+let airXlsxBook=null,airXlsxName="",airXlsxModified=0;
+const airXlsxEsc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function ensureExcelJs(){
+ return new Promise((resolve,reject)=>{
+  if(window.ExcelJS)return resolve();
+  const script=document.createElement("script");
+  script.src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js";
+  script.onload=resolve;script.onerror=()=>reject(new Error("Не удалось загрузить редактор Excel. Проверьте подключение к интернету."));
+  document.head.appendChild(script);
+ });
+}
+window.openAirWorkbook=async()=>{
+ const file=document.getElementById("airBookFile").files[0],info=document.getElementById("airBookInfo");
+ if(!file)return;
+ if(!/\.xlsx$/i.test(file.name)){info.textContent="Выберите файл .xlsx";return}
+ info.textContent="Читаю Excel...";
+ try{
+  await ensureExcelJs();
+  const wb=new ExcelJS.Workbook();
+  await wb.xlsx.load(await file.arrayBuffer());
+  airXlsxBook=wb;airXlsxName=file.name;airXlsxModified=0;
+  const choice=document.getElementById("airBookSheet");
+  choice.innerHTML="";
+  wb.worksheets.forEach((ws,i)=>{let opt=document.createElement("option");opt.value=String(i);opt.textContent=ws.name;choice.appendChild(opt)});
+  const primary=wb.worksheets.findIndex(x=>x.name==="Allikate kaupa");choice.value=String(Math.max(primary,0));
+  document.getElementById("airBookSave").disabled=false;
+  drawAirWorkbook();
+ }catch(e){info.textContent="Ошибка чтения Excel: "+(e?.message||e);airXlsxBook=null}
+};
+function workbookCellValue(cell){
+ const v=cell.value;
+ if(v&&typeof v==="object"){
+  if(v.formula||v.sharedFormula)return v.result??"ƒ";
+  if(v.richText)return v.richText.map(x=>x.text).join("");
+  if(v.text)return v.text;
+  if(v.hyperlink)return v.text||v.hyperlink;
+  if(v instanceof Date)return v.toLocaleDateString("ru-RU");
+ }
+ return v==null?"":String(v);
+}
+window.drawAirWorkbook=()=>{
+ if(!airXlsxBook)return;
+ const ws=airXlsxBook.worksheets[Number(document.getElementById("airBookSheet").value)],root=document.getElementById("airBookGrid");
+ if(!ws)return;
+ const maxR=Math.min(ws.rowCount,350),maxC=Math.min(ws.columnCount,85);
+ let html='<table style="border-collapse:collapse;font-size:12px;width:max-content;min-width:100%"><thead><tr><th style="position:sticky;top:0;left:0;background:#e5e7eb;z-index:3">#</th>';
+ for(let c=1;c<=maxC;c++){let n=c,t="";while(n){n--;t=String.fromCharCode(65+n%26)+t;n=Math.floor(n/26)}html+='<th style="position:sticky;top:0;background:#e5e7eb;z-index:2;padding:6px">'+t+'</th>'}
+ html+='</tr></thead><tbody>';
+ let inputs=0,formulas=0;
+ for(let r=1;r<=maxR;r++){
+  html+='<tr><th style="position:sticky;left:0;background:#e5e7eb;z-index:1;padding:4px">'+r+'</th>';
+  for(let c=1;c<=maxC;c++){
+   const cell=ws.getRow(r).getCell(c),v=cell.value;
+   const formula=!!(v&&typeof v==="object"&&(v.formula||v.sharedFormula));
+   const editable=typeof v==="number"&&!formula;
+   if(formula)formulas++;
+   if(editable)inputs++;
+   const style='border:1px solid #d8dfe7;min-width:85px;max-width:260px;padding:3px;vertical-align:top;'+(editable?'background:#e2e4e7;':'background:#fff;');
+   html+='<td style="'+style+'">';
+   if(editable)html+='<input type="number" step="any" data-cell="'+airXlsxEsc(cell.address)+'" value="'+airXlsxEsc(v)+'" onchange="editAirWorkbookCell(this)" style="width:100%;min-width:65px;padding:4px;border:1px solid #9ca3af;border-radius:3px;background:#e2e4e7;color:#111827">';
+   else html+='<div title="'+(formula?'Расчётная формула (не редактируется)':'Защищённое значение')+'" style="max-height:64px;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere">'+airXlsxEsc(workbookCellValue(cell))+(formula?' <small style="color:#64748b">ƒ</small>':'')+'</div>';
+   html+='</td>';
+  }
+  html+='</tr>';
+ }
+ html+='</tbody></table>';root.innerHTML=html;
+ document.getElementById("airBookInfo").textContent=airXlsxName+" · "+ws.name+" · входных чисел: "+inputs+", формул: "+formulas+" · изменений: "+airXlsxModified+". В больших таблицах показаны первые 350 строк и 85 столбцов.";
+};
+window.editAirWorkbookCell=el=>{
+ if(!airXlsxBook)return;
+ const ws=airXlsxBook.worksheets[Number(document.getElementById("airBookSheet").value)],cell=ws.getCell(el.dataset.cell);
+ const n=Number(el.value);
+ if(el.value.trim()===""||!Number.isFinite(n)){el.style.borderColor="#b91c1c";return}
+ cell.value=n;el.style.borderColor="#16a34a";airXlsxModified++;
+ document.getElementById("airBookInfo").textContent="Изменено числовых ячеек: "+airXlsxModified+". Сохраните файл XLSX для пересчёта формул в Excel.";
+};
+window.saveAirWorkbook=async()=>{
+ if(!airXlsxBook)return;
+ const info=document.getElementById("airBookInfo");info.textContent="Подготавливаю XLSX...";
+ try{
+  const bytes=await airXlsxBook.xlsx.writeBuffer(),blob=new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download=airXlsxName.replace(/\.xlsx$/i,"")+"_изменено.xlsx";document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  info.textContent="Копия XLSX сохранена. Откройте её в Excel для полного перерасчёта взаимосвязанных формул.";
+ }catch(e){info.textContent="Ошибка сохранения: "+(e?.message||e)}
+};
 
 </script>
 
