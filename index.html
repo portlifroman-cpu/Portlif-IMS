@@ -45,7 +45,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <div id="appView" class="shell hidden">
 <aside class="side"><div class="logo"><div class="mark"><img src="/portlif-logo.svg" alt="Portlif Grupp OÜ"></div><div><b>PORTLIF IMS</b><div style="opacity:.65;font-size:12px">Portlif Grupp OÜ</div></div></div>
 <div class="nav">
-<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="wasteMovement">Движение отходов</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button><button data-page="pyrolysis">Пиролизная установка</button>
+<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="wasteMovement">Движение отходов</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button><button data-page="pyrolysis">Пиролизная установка</button><button data-page="airReport">Отчёт по воздуху</button>
 </div></aside>
 <main class="main">
 <div class="top"><div><span class="badge" id="roleBadge">PORTLIF</span><h1 id="pageTitle">Главная</h1></div><div><span id="userEmail" class="muted"></span> <button id="logoutBtn" class="btn soft">Выйти</button></div></div>
@@ -278,6 +278,33 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 
 <section id="equipment" class="section"><div class="panel"><div class="toolbar"><h3>Оборудование</h3><button class="btn primary" onclick="toggle('eqForm')">+ Оборудование</button></div>
 <div id="eqForm" class="hidden"><div class="formgrid"><div><label>Наименование</label><input id="eName" class="field"></div><div><label>Модель</label><input id="eModel" class="field"></div><div><label>Серийный №</label><input id="eSerial" class="field"></div><div><label>Место</label><input id="eLocation" class="field"></div><div><label>Следующее ТО</label><input id="eService" type="date" class="field"></div><div><label>Критичное</label><select id="eCritical" class="field"><option value="false">Нет</option><option value="true">Да</option></select></div></div><div class="actions"><button class="btn primary" onclick="saveEquipment()">Сохранить</button></div></div><div id="eqTable" class="tablewrap"></div></div></section>
+<section id="airReport" class="section">
+<div class="panel">
+ <div class="toolbar"><h3>Отчёт по воздуху · учёт выбросов</h3><button class="btn soft" onclick="loadAirReport()">Обновить</button></div>
+ <p class="muted">Внутренний журнал инструментальных замеров и расчётных выбросов. Показатели вводятся по протоколам лаборатории и утверждённым расчётам. Не является официальной декларацией и не заменяет экологическое разрешение или отчётность в KOTKAS.</p>
+ <div class="formgrid">
+ <div><label>Дата замера / расчёта</label><input id="airDate" type="date" class="field"></div>
+ <div><label>Источник выброса</label><input id="airSource" class="field" placeholder="Например: дымовая труба установки"></div>
+ <div><label>Загрязняющее вещество</label><select id="airPollutant" class="field"><option>CO</option><option>NOx</option><option>SO₂</option><option>Пыль / PM</option><option>ЛОС / VOC</option><option>H₂S</option><option>CO₂</option><option>Другое (указать в примечании)</option></select></div>
+ <div><label>Тип данных</label><select id="airType" class="field"><option value="measurement">Лабораторный замер</option><option value="calculated">Расчёт</option></select></div>
+ <div><label>Концентрация, мг/Нм³</label><input id="airConcentration" class="field" type="number" min="0" step="any" placeholder="При наличии"></div>
+ <div><label>Расход газа, Нм³/ч</label><input id="airFlow" class="field" type="number" min="0" step="any" placeholder="При наличии"></div>
+ <div><label>Время работы, ч</label><input id="airHours" class="field" type="number" min="0" step="any" placeholder="При наличии"></div>
+ <div><label>Выброс, кг (если известен)</label><input id="airMass" class="field" type="number" min="0" step="any" placeholder="Или будет рассчитан"></div>
+ <div><label>№ протокола / документа</label><input id="airProtocol" class="field"></div>
+ <div><label>Лаборатория / методика</label><input id="airLaboratory" class="field"></div>
+ </div>
+ <label>Примечание / условия измерения</label><textarea id="airNotes" class="field" rows="2" placeholder="Методика, условия приведения газа, установки, замечания"></textarea>
+ <div class="actions"><button class="btn primary" onclick="saveAirRecord()">Сохранить запись</button><span id="airMessage" class="muted" role="status"></span></div>
+ <p class="muted">Автоматический расчёт массы: мг/Нм³ × Нм³/ч × часы ÷ 1 000 000 = кг. Использовать только при согласованных условиях приведения концентрации и расхода, одной методике и репрезентативном периоде. Раздельно указывайте расчётные и измеренные данные.</p>
+</div>
+<div class="panel">
+ <div class="toolbar"><h3>Журнал и выгрузка</h3><button class="btn soft" onclick="downloadAirReport()">Скачать CSV</button></div>
+ <div class="formgrid"><div><label>Месяц</label><input id="airMonth" type="month" class="field"></div><div><label>Выборка</label><button class="btn soft" onclick="loadAirReport()">Сформировать отчёт</button></div></div>
+ <div id="airSummary" class="muted"></div><div class="tablewrap" id="airTable"></div>
+ <p class="muted">Для официальной отчётности дополнительно требуются перечень разрешённых источников, вещества и коды по экологическому разрешению, методики, единицы, календарная инвентаризация и проверка ответственным специалистом.</p>
+</div>
+</section>
 <section id="pyrolysis" class="section">
 <div class="panel">
 <div class="toolbar"><h3>Пиролизная установка · Журнал циклов</h3><button class="btn primary" onclick="showPyroTab('journal');toggle('pyroForm')">+ Новый цикл</button></div>
@@ -845,6 +872,47 @@ async function loadPyroCycles(){
  $("pyroTable").innerHTML=table(["Дата","Цикл","Сырьё / резервуар","Загрузка, т","Масло, т","Вода, т","Остаток, т","Неучтённое, т","Выход масла","t °C","кВт·ч","Оператор"],rows.map(r=>[esc(r.cycle_date),esc(r.batch_code||"—"),esc([r.raw_material,r.source_tank].filter(Boolean).join(" / ")||"—"),pyroFmt(r.input_tonnes,3),pyroFmt(r.oil_tonnes,3),pyroFmt(r.water_tonnes,3),pyroFmt(r.residue_tonnes,3),pyroFmt(pyroNumber(r.input_tonnes)-pyroNumber(r.oil_tonnes)-pyroNumber(r.water_tonnes)-pyroNumber(r.residue_tonnes),3),pyroNumber(r.input_tonnes)?pyroFmt(pyroNumber(r.oil_tonnes)/pyroNumber(r.input_tonnes)*100,1)+" %":"—",r.temperature_c==null?"—":pyroFmt(r.temperature_c,1),r.energy_kwh==null?"—":pyroFmt(r.energy_kwh,1),esc(r.operator_name||"—")]));
 }
 $("pyDate").value=new Date().toLocaleDateString("en-CA");
+
+
+const airField=id=>document.getElementById(id);
+let airRows=[];
+const airNumeric=id=>{const v=airField(id).value.trim();return v===""?null:Number(v)};
+const airSafeNumber=v=>v==null?"":Number(v).toLocaleString("ru-RU",{maximumFractionDigits:5});
+window.saveAirRecord=async()=>{
+ const date=airField("airDate").value, source=airField("airSource").value.trim(), pollutant=airField("airPollutant").value, type=airField("airType").value;
+ const concentration=airNumeric("airConcentration"), flow=airNumeric("airFlow"), hours=airNumeric("airHours"), provided=airNumeric("airMass");
+ const msg=airField("airMessage");msg.textContent="";
+ if(!date||!source){msg.textContent="Укажите дату и источник выброса";return}
+ if([concentration,flow,hours,provided].some(v=>v!==null&&(!Number.isFinite(v)||v<0))){msg.textContent="Числовые значения должны быть неотрицательными";return}
+ const derived=provided!==null?provided:(concentration!==null&&flow!==null&&hours!==null?concentration*flow*hours/1e6:null);
+ if(concentration===null&&derived===null){msg.textContent="Укажите концентрацию либо массу выброса";return}
+ msg.textContent="Сохраняем...";
+ const row={measured_at:date,source_name:source,pollutant,measurement_type:type,concentration_mg_m3:concentration,flow_nm3_h:flow,operating_hours:hours,emission_kg:derived,protocol_no:airField("airProtocol").value.trim()||null,laboratory:airField("airLaboratory").value.trim()||null,notes:airField("airNotes").value.trim()||null};
+ const {error}=await db.from("portlif_air_monitoring").insert(row);
+ if(error){msg.textContent="Ошибка: "+error.message;return}
+ msg.textContent="Запись сохранена";airField("airMonth").value=date.slice(0,7);await loadAirReport();
+};
+window.loadAirReport=async()=>{
+ const month=airField("airMonth").value||new Date().toISOString().slice(0,7);
+ const from=month+"-01", to=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),1)).toISOString().slice(0,10);
+ const {data,error}=await db.from("portlif_air_monitoring").select("*").gte("measured_at",from).lt("measured_at",to).order("measured_at",{ascending:false}).limit(1000);
+ if(error){airField("airSummary").textContent="Ошибка загрузки: "+error.message;return}
+ airRows=data||[];
+ const totals={};for(const r of airRows)if(r.emission_kg!==null){totals[r.pollutant]=(totals[r.pollutant]||0)+Number(r.emission_kg)}
+ airField("airSummary").textContent="Записей: "+airRows.length+". Масса по веществам (кг): "+(Object.entries(totals).map(([k,v])=>k+" — "+airSafeNumber(v)).join("; ")||"нет данных");
+ airField("airTable").innerHTML=table(["Дата","Источник","Вещество","Тип","мг/Нм³","Нм³/ч","ч","кг","Протокол","Лаборатория","Примечание"],airRows.map(r=>[esc(r.measured_at),esc(r.source_name),esc(r.pollutant),r.measurement_type==="measurement"?"Замер":"Расчёт",airSafeNumber(r.concentration_mg_m3),airSafeNumber(r.flow_nm3_h),airSafeNumber(r.operating_hours),airSafeNumber(r.emission_kg),esc(r.protocol_no||"—"),esc(r.laboratory||"—"),esc(r.notes||"—")]));
+};
+window.downloadAirReport=()=>{
+ if(!airRows.length){airField("airSummary").textContent="Нет записей за выбранный месяц";return}
+ const cols=["Дата","Источник","Вещество","Тип","Концентрация мг/Нм3","Расход Нм3/ч","Часы","Выброс кг","Протокол","Лаборатория","Примечание"];
+ const values=airRows.map(r=>[r.measured_at,r.source_name,r.pollutant,r.measurement_type,r.concentration_mg_m3,r.flow_nm3_h,r.operating_hours,r.emission_kg,r.protocol_no,r.laboratory,r.notes]);
+ const cell=x=>'"'+String(x??"").replace(/"/g,'""')+'"';
+ const csv="\uFEFF"+[cols,...values].map(row=>row.map(cell).join(";")).join("\r\n");
+ const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+ a.href=url;a.download="portlif_air_report_"+airField("airMonth").value+".csv";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+airField("airDate").value=new Date().toLocaleDateString("en-CA");
+airField("airMonth").value=new Date().toLocaleDateString("en-CA").slice(0,7);
 
 </script>
 
