@@ -45,7 +45,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <div id="appView" class="shell hidden">
 <aside class="side"><div class="logo"><div class="mark"><img src="/portlif-logo.svg" alt="Portlif Grupp OÜ"></div><div><b>PORTLIF IMS</b><div style="opacity:.65;font-size:12px">Portlif Grupp OÜ</div></div></div>
 <div class="nav">
-<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="wasteMovement">Движение отходов</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button><button data-page="pyrolysis">Пиролизная установка</button><button data-page="airReport">Отчёт по воздуху</button><button data-page="airWorkbook">Расчётная Excel-таблица</button>
+<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="wasteMovement">Движение отходов</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button><button data-page="pyrolysis">Пиролизная установка</button><button data-page="airReport">Отчёт по воздуху</button>
 </div></aside>
 <main class="main">
 <div class="top"><div><span class="badge" id="roleBadge">PORTLIF</span><h1 id="pageTitle">Главная</h1></div><div><span id="userEmail" class="muted"></span> <button id="logoutBtn" class="btn soft">Выйти</button></div></div>
@@ -278,7 +278,8 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 
 <section id="equipment" class="section"><div class="panel"><div class="toolbar"><h3>Оборудование</h3><button class="btn primary" onclick="toggle('eqForm')">+ Оборудование</button></div>
 <div id="eqForm" class="hidden"><div class="formgrid"><div><label>Наименование</label><input id="eName" class="field"></div><div><label>Модель</label><input id="eModel" class="field"></div><div><label>Серийный №</label><input id="eSerial" class="field"></div><div><label>Место</label><input id="eLocation" class="field"></div><div><label>Следующее ТО</label><input id="eService" type="date" class="field"></div><div><label>Критичное</label><select id="eCritical" class="field"><option value="false">Нет</option><option value="true">Да</option></select></div></div><div class="actions"><button class="btn primary" onclick="saveEquipment()">Сохранить</button></div></div><div id="eqTable" class="tablewrap"></div></div></section>
-<section id="airWorkbook" class="section">
+<section id="airReport" class="section">
+<div id="airWorkbook" class="air-workbook-inner">
 <div class="panel">
   <div class="toolbar"><h3>Расчётная таблица выбросов · õhuarvutused</h3></div>
   <p class="muted">Откройте оригинальный Excel за I, II или III квартал 2026. Серым отмечаются числовые входные ячейки без формул. Ячейки с формулами защищены от редактирования. После изменения сохраните копию XLSX — Microsoft Excel пересчитает формулы при открытии файла.</p>
@@ -291,8 +292,8 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
   <div id="airBookGrid" style="overflow:auto;max-height:65vh;border:1px solid #d3dce3;border-radius:10px"></div>
   <p class="muted">Предупреждение: цвет исходных ячеек и заполнение могут различаться между листами. Входные значения отображаются серым только для чисел без формул; текст, ссылки и расчётные ячейки защищены. Для официального отчёта проверяйте результат в Excel по согласованной методике.</p>
 </div>
-</section>
-<section id="airReport" class="section">
+</div>
+
 <div class="panel">
  <div class="toolbar"><h3>Отчёт по воздуху · учёт выбросов</h3><button class="btn soft" onclick="loadAirReport()">Обновить</button></div>
  <p class="muted">Структура источников и веществ приведена в соответствие с квартальными рабочими книгами Portlif Grupp OÜ «õhuarvutused» за I–III кварталы 2026 года. В CRM ведутся записи расчётов/замеров; оригинальные Excel с взаимосвязанными формулами остаются первичным расчётным шаблоном. Этот экран не воспроизводит все формулы 14 листов и не заменяет официальную отчётность KOTKAS.</p>
