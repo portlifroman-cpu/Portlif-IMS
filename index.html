@@ -531,19 +531,22 @@ $("saveNewPassword").onclick=async()=>{
   m.className="msg err";
   if(p1.length<8){m.textContent="Пароль должен содержать минимум 8 символов.";return}
   if(p1!==p2){m.textContent="Пароли не совпадают.";return}
+  const {data:sd,error:se}=await db.auth.getSession();
+  if(se||!sd?.session){m.textContent="Ссылка восстановления устарела либо сессия отсутствует. Откройте последнее письмо ещё раз.";return}
   const {error}=await db.auth.updateUser({password:p1});
   if(error && error.code!=="same_password"){m.textContent="Не удалось изменить пароль: "+error.message;return}
   m.className="msg ok";
   m.textContent=error?.code==="same_password"?"Этот пароль уже установлен. Открываю Portlif IMS.":"Пароль изменён. Сейчас откроется Portlif IMS.";
-  setTimeout(async()=>{ $("passwordResetModal").classList.add("hidden");if(new URLSearchParams(location.search).get("invite")==="1")history.replaceState({}, "", location.pathname); await boot(); },300);
+  setTimeout(async()=>{ $("passwordResetModal").classList.add("hidden");recoveryMode=false;history.replaceState({}, "", location.pathname); await boot(); },300);
 };
 
+const recoveryLinkOpened=new URLSearchParams(location.search).get("type")==="recovery"||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery";
+let recoveryMode=recoveryLinkOpened;
+const showPasswordSetup=()=>{$("passwordResetModal").classList.remove("hidden");$("authTitle").textContent="Вход в Portlif IMS";};
 db.auth.onAuthStateChange((event,session)=>{
-  const isInvite=new URLSearchParams(location.search).get("invite")==="1";
-  if((event==="PASSWORD_RECOVERY" || (event==="SIGNED_IN" && isInvite)) && session){
-    $("passwordResetModal").classList.remove("hidden");
-    $("authTitle").textContent="Вход в Portlif IMS";
-  }
+  const invite=new URLSearchParams(location.search).get("invite")==="1";
+  if(event==="PASSWORD_RECOVERY"){recoveryMode=true;showPasswordSetup();}
+  else if(session&&((event==="SIGNED_IN"&&invite)||(recoveryMode&&(event==="SIGNED_IN"||event==="INITIAL_SESSION"))))showPasswordSetup();
 });
 
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));$(b.dataset.page).classList.add("active");$("pageTitle").textContent=b.textContent});
@@ -859,7 +862,9 @@ window.saveWarehouseStock=async()=>{
 
 async function loadEquipment(){const {data=[]}=await db.from("portlif_equipment").select("*").order("name");$("eqTable").innerHTML=table(["Оборудование","Модель","Серийный №","Место","Следующее ТО","Критичное","Статус"],data.map(x=>[esc(x.name),esc(x.model||"—"),esc(x.serial_no||"—"),esc(x.location||"—"),x.next_service_date||"—",x.critical?"Да":"Нет",esc(x.status)]))}
 window.saveEquipment=async()=>{const row={name:$("eName").value.trim(),model:$("eModel").value.trim()||null,serial_no:$("eSerial").value.trim()||null,location:$("eLocation").value.trim()||null,next_service_date:$("eService").value||null,critical:$("eCritical").value==="true",status:"active"};if(!row.name)return alert("Введите наименование");const {error}=await db.from("portlif_equipment").insert(row);if(error)return alert(error.message);toggle("eqForm");await refreshAll()};
-await boot();
+const {data:initialAuth}=await db.auth.getSession();
+if(initialAuth?.session && (recoveryMode||new URLSearchParams(location.search).get("invite")==="1"))showPasswordSetup();
+else await boot();
 
 window.showPyroTab=id=>{document.querySelectorAll("#pyrolysis .py-tab-panel").forEach(el=>el.classList.toggle("active",el.id==="py-tab-"+id));document.querySelectorAll("#pyrolysis .py-tabs button").forEach(b=>{const on=b.getAttribute("onclick")?.includes("'"+id+"'");b.classList.toggle("active",!!on);b.setAttribute("aria-selected",on?"true":"false")})};
 const pyroNumber=v=>Number(v||0);
