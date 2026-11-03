@@ -51,6 +51,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <div class="top"><div><span class="badge" id="roleBadge">PORTLIF</span><h1 id="pageTitle">Главная</h1></div><div><span id="userEmail" class="muted"></span> <button id="logoutBtn" class="btn soft">Выйти</button></div></div>
 
 <section id="home" class="section active">
+<div class="panel"><div class="toolbar"><h3>Защита аккаунта</h3><button class="btn soft" type="button" onclick="startPortlifMfaEnroll()">Подключить двухфакторную защиту</button></div><div class="muted" id="mfaStatus">Для защиты учётной записи используйте приложение-аутентификатор (TOTP).</div></div>
 <div class="grid"><div class="stat"><span>Контрагенты</span><b id="kClients">0</b></div><div class="stat"><span>Активные партии</span><b id="kLots">0</b></div><div class="stat"><span>Перевозки</span><b id="kShip">0</b></div><div class="stat"><span>Открытые CAPA</span><b id="kCapa">0</b></div></div>
 <div class="panel"><h3>Направления Portlif</h3><div id="services" class="formgrid"></div></div>
 
@@ -492,6 +493,7 @@ async function ensureMembership(){
 }
 async function boot(){
  const {data:{user:u}}=await db.auth.getUser(); user=u; if(!user)return;
+ if(await portlifMfaRequiresVerification())return;
  try{membership=await ensureMembership();$("userEmail").textContent=user.email||"";$("roleBadge").textContent=membership.role.toUpperCase();$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");if(["owner","manager"].includes(membership.role)){$("userAdminPanel").classList.remove("hidden");await loadPortlifUsers()}await refreshAll()}
  catch(e){await db.auth.signOut();msg(e.message)}
 }
@@ -551,6 +553,64 @@ $("saveNewPassword").onclick=async()=>{
   m.className="msg ok";
   m.textContent=error?.code==="same_password"?"Этот пароль уже установлен. Открываю Portlif IMS.":"Пароль изменён. Сейчас откроется Portlif IMS.";
   setTimeout(async()=>{ $("passwordResetModal").classList.add("hidden");recoveryMode=false;history.replaceState({}, "", location.pathname); await boot(); },300);
+};
+
+
+let portlifMfaMode="",portlifMfaFactorId="";
+function portlifMfaMessage(t){$("portlifMfaMessage").textContent=t||"";}
+function portlifMfaOpen(){ $("portlifMfaModal").classList.remove("hidden");$("portlifMfaCode").value="";portlifMfaMessage(""); }
+async function portlifMfaRequiresVerification(){
+ const {data,error}=await db.auth.mfa.getAuthenticatorAssuranceLevel();
+ if(error)return false;
+ if(data?.currentLevel==="aal1"&&data?.nextLevel==="aal2"){
+  const factors=await db.auth.mfa.listFactors();
+  const verified=factors.data?.totp?.find(f=>f.status==="verified");
+  if(verified){
+   portlifMfaMode="challenge";portlifMfaFactorId=verified.id;portlifMfaOpen();
+   $("portlifMfaHeading").textContent="Подтверждение входа";
+   $("portlifMfaHelp").textContent="Введи код из приложения-аутентификатора для входа в Portlif IMS.";
+   $("portlifMfaQr").classList.add("hidden");
+   $("portlifMfaCancel").textContent="Выйти";
+   $("portlifMfaCancel").onclick=async()=>{await db.auth.signOut();location.reload();};
+   return true;
+  }
+ }
+ return false;
+}
+window.startPortlifMfaEnroll=async()=>{
+ portlifMfaMode="enroll";portlifMfaOpen();
+ $("portlifMfaHeading").textContent="Подключение двухфакторной защиты";
+ $("portlifMfaHelp").textContent="Отсканируй QR-код приложением-аутентификатором и введи шестизначный код. Не отправляй QR-код другим людям.";
+ $("portlifMfaQr").classList.add("hidden");
+ $("portlifMfaCancel").textContent="Отмена";
+ $("portlifMfaCancel").onclick=()=>{$("portlifMfaModal").classList.add("hidden");};
+ const current=await db.auth.mfa.listFactors();
+ if(current.data?.totp?.some(x=>x.status==="verified")){
+  $("portlifMfaMessage").textContent="Двухфакторная защита уже подключена.";
+  return;
+ }
+ const {data,error}=await db.auth.mfa.enroll({factorType:"totp",friendlyName:"Portlif IMS"});
+ if(error){portlifMfaMessage("Не удалось начать подключение: "+error.message);return;}
+ portlifMfaFactorId=data.id;
+ $("portlifMfaQr").src=data.totp.qr_code;
+ $("portlifMfaQr").classList.remove("hidden");
+};
+$("portlifMfaConfirm").onclick=async()=>{
+ const code=$("portlifMfaCode").value.trim();
+ if(!/^\d{6}$/.test(code)){portlifMfaMessage("Введите шестизначный код.");return;}
+ if(!portlifMfaFactorId){portlifMfaMessage("Не выбран фактор авторизации.");return;}
+ $("portlifMfaConfirm").disabled=true;
+ try{
+  const {data:challenge,error:challengeError}=await db.auth.mfa.challenge({factorId:portlifMfaFactorId});
+  if(challengeError){portlifMfaMessage(challengeError.message);return;}
+  const {error}=await db.auth.mfa.verify({factorId:portlifMfaFactorId,challengeId:challenge.id,code});
+  if(error){portlifMfaMessage("Код не принят: "+error.message);return;}
+  $("portlifMfaModal").classList.add("hidden");
+  $("portlifMfaQr").src="";
+  if($("mfaStatus"))$("mfaStatus").textContent="Двухфакторная защита активна.";
+  if(portlifMfaMode==="challenge")await boot();
+  else alert("Двухфакторная защита подключена. При следующих входах понадобится одноразовый код.");
+ }finally{$("portlifMfaConfirm").disabled=false;}
 };
 
 const recoveryLinkOpened=new URLSearchParams(location.search).get("type")==="recovery"||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery";
@@ -1068,6 +1128,22 @@ window.loadPlcMonitor=async()=>{
 };
 
 </script>
+
+
+<div id="portlifMfaModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:10020;padding:15px">
+ <div class="card" style="width:min(480px,100%);max-height:95vh;overflow:auto">
+   <h3 id="portlifMfaHeading">Двухфакторная защита</h3>
+   <p id="portlifMfaHelp" class="muted">Введите 6-значный код из приложения-аутентификатора.</p>
+   <img id="portlifMfaQr" alt="QR-код для настройки аутентификатора" class="hidden" style="width:200px;max-width:100%">
+   <label>Одноразовый код</label>
+   <input id="portlifMfaCode" class="field" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+   <p id="portlifMfaMessage" role="status" class="msg"></p>
+   <div class="actions">
+     <button id="portlifMfaConfirm" class="btn primary" type="button">Подтвердить</button>
+     <button id="portlifMfaCancel" class="btn soft" type="button">Закрыть</button>
+   </div>
+ </div>
+</div>
 
 <div id="passwordResetModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;z-index:9999;padding:20px">
   <div class="card" style="width:min(440px,100%)">
