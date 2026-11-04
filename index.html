@@ -45,7 +45,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
 <div id="appView" class="shell hidden">
 <aside class="side"><div class="logo"><div class="mark"><img src="/portlif-logo.svg" alt="Portlif Grupp OÜ"></div><div><b>PORTLIF IMS</b><div style="opacity:.65;font-size:12px">Portlif Grupp OÜ</div></div></div>
 <div class="nav">
-<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="wasteMovement">Движение отходов</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button><button data-page="pyrolysis">Пиролизная установка</button><button data-page="plcMonitor">Контроллеры ABB</button><button data-page="airReport">Отчёт по воздуху</button>
+<button class="active" data-page="home">Главная</button><button data-page="clients">Контрагенты</button><button data-page="lots">Партии</button><button data-page="logistics">Логистика</button><button data-page="lab">Лаборатория</button><button data-page="iso">ISO / QHSE</button><button data-page="docs">Документы</button><button data-page="wasteMovement">Движение отходов</button><button data-page="warehouse">Склад отходов</button><button data-page="equipment">Оборудование</button><button data-page="pyrolysis">Пиролизная установка</button><button data-page="plcMonitor">Мониторинг SCADA</button><button data-page="scadaTanks">Датчики M1–M7</button><button data-page="airReport">Отчёт по воздуху</button>
 </div></aside>
 <main class="main">
 <div class="top"><div><span class="badge" id="roleBadge">PORTLIF</span><h1 id="pageTitle">Главная</h1></div><div><span id="userEmail" class="muted"></span> <button id="logoutBtn" class="btn soft">Выйти</button></div></div>
@@ -319,6 +319,16 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px 8px
  <div class="formgrid"><div><label>Квартал</label><select id="airQuarter" class="field"><option value="2026-1">2026 · I квартал</option><option value="2026-2">2026 · II квартал</option><option value="2026-3">2026 · III квартал</option><option value="2026-4">2026 · IV квартал</option></select></div><div><label>Выборка</label><button class="btn soft" onclick="loadAirReport()">Сформировать отчёт</button></div></div>
  <div id="airSummary" class="muted"></div><div class="tablewrap" id="airTable"></div>
  <p class="muted">В исходной Excel-методике используются разные единицы (г/с, т/год, кг/год, мг/год, OU/с). Массы в этой форме показаны в кг за выбранный период и не приравниваются автоматически к итогам исходной методики. Для юридически значимого отчёта используйте проверенный расчёт в оригинальной книге и экологическое разрешение KKL/320411.</p>
+</div>
+</section>
+<section id="scadaTanks" class="section">
+<div class="panel">
+ <div class="toolbar"><h3>Резервуары M1–M7 · данные Citect SCADA</h3><button type="button" class="btn soft" onclick="loadScadaTanks()">Обновить показания</button></div>
+ <p class="muted"><b>Исключительно мониторинг.</b> Складской учёт не связан с этой страницей: показания PLC/SCADA не создают движения, не пересчитывают складские остатки и не изменяют ёмкости в складе. Данные появятся только после безопасного подключения локального шлюза.</p>
+ <p id="scadaTanksStatus" class="muted">Показания ещё не загружены.</p>
+ <div id="scadaTankCards" class="grid"></div>
+ <div class="tablewrap" id="scadaTankTagTable"></div>
+ <p class="muted">Источник карты тегов: Portlif_2018 / variable.DBF. Адреса 3000–3027 — адреса Citect; смещение Modbus-регистров пока не подтверждено. R0–R6 — внутренние вычисляемые значения SCADA, а не регистры контроллера. Для M6/M7 необходимо проверить влияние плотности на уровни гидростатических датчиков. Не открывайте TCP 502 в интернет.</p>
 </div>
 </section>
 <section id="plcMonitor" class="section">
@@ -1125,6 +1135,64 @@ window.loadPlcMonitor=async()=>{
  esc(new Date(r.measured_at).toLocaleString("ru-RU")),
  esc(r.quality==="good"?"Достоверно":r.quality==="bad"?"Ошибка":"Не проверено")
  ]));
+};
+
+
+window.loadScadaTanks=async()=>{
+ const state=$("scadaTanksStatus");
+ state.textContent="Читаем карту сигналов и последнюю телеметрию...";
+ const [cfg,measurements]=await Promise.all([
+  db.from("portlif_scada_signal_map").select("tank,kind,tag,io_device,citect_address,raw_min,raw_max,eng_min,eng_max,unit,plc_device,modbus_verified").order("tank").order("kind"),
+  db.from("portlif_plc_readings").select("device_id,signal_key,value_numeric,unit,measured_at,quality").order("measured_at",{ascending:false}).limit(500)
+ ]);
+ if(cfg.error||measurements.error){state.textContent="Не удалось прочитать SCADA-мониторинг: "+(cfg.error?.message||measurements.error?.message);return;}
+ const list=cfg.data||[], recent=new Map();
+ // The gateway must send raw signals as TAG.raw, with unit=raw, quality=good.
+ // For internal calculated Citect volumes, a validated gateway can send TAG with unit=m³.
+ for(const r of measurements.data||[]){
+   const id=r.device_id+"|"+r.signal_key;
+   if(!recent.has(id))recent.set(id,r);
+ }
+ const now=Date.now();
+ const take=(c)=>{
+   const key=c.io_device==="VariableDevice"?c.tag:c.tag+".raw";
+   const r=recent.get((c.plc_device||"plc1")+"|"+key);
+   if(!r || r.quality!=="good" || !Number.isFinite(r.value_numeric))return null;
+   const age=now-Date.parse(r.measured_at);
+   if(!Number.isFinite(age)||age<0||age>120000)return null;
+   if(c.io_device==="VariableDevice"){
+     if(r.unit!==c.unit)return null;
+     return {value:Number(r.value_numeric),date:r.measured_at};
+   }
+   if(!c.modbus_verified || r.unit!=="raw")return null;
+   const raw=Number(r.value_numeric);
+   if(raw<c.raw_min || raw>c.raw_max)return null;
+   return {value:Number(c.eng_min)+(raw-Number(c.raw_min))*(Number(c.eng_max)-Number(c.eng_min))/(Number(c.raw_max)-Number(c.raw_min)),date:r.measured_at};
+ };
+ const byTank=(tank,kind)=>list.find(c=>c.tank===tank&&c.kind===kind);
+ const label=(tag)=>{
+   if(!tag)return "—";
+   const m=take(tag);
+   return m?Number(m.value).toLocaleString("ru-RU",{maximumFractionDigits:1})+" "+tag.unit:"Нет данных";
+ };
+ let liveCount=0;
+ $("scadaTankCards").innerHTML=["M1","M2","M3","M4","M5","M6","M7"].map(t=>{
+  const lev=byTank(t,"level"),temp=byTank(t,"temperature"),volume=byTank(t,"volume"),phase=byTank(t,"interface");
+  if(lev&&take(lev))liveCount++;
+  return '<div class="stat"><h3>'+esc(t)+'</h3>'+
+   '<div>Уровень: <b style="font-size:17px">'+esc(label(lev))+'</b></div>'+
+   '<div>Температура: <strong>'+esc(label(temp))+'</strong></div>'+
+   '<div>Объём SCADA: <strong>'+esc(label(volume))+'</strong></div>'+
+   (phase?'<div>Граница фаз: <strong>'+esc(label(phase))+'</strong></div>':'')+
+   '<small class="muted">Источник: '+esc(lev?.tag||"—")+' · '+esc(temp?.tag||"—")+'</small></div>';
+ }).join("");
+ $("scadaTankTagTable").innerHTML=table(["Ёмкость","Тип сигнала","Тег","Адрес Citect","Масштабирование","Статус"],list.map(c=>[
+  esc(c.tank),esc({level:"Уровень",temperature:"Температура",interface:"Граница фаз",volume:"Расчётный объём"}[c.kind]||c.kind),
+  esc(c.tag),esc(c.citect_address),
+  c.raw_min==null?"Расчёт внутри Citect":esc(c.raw_min+"–"+c.raw_max+" → "+c.eng_min+"–"+c.eng_max+" "+c.unit),
+  c.io_device==="VariableDevice"?"Только из SCADA":c.modbus_verified?"Адрес подтверждён":"Ожидает проверки Modbus"
+ ]));
+ state.textContent=liveCount?"Свежие подтверждённые уровни: "+liveCount+" из 7. Показания считаются актуальными только в течение 2 минут.":"Свежих подтверждённых показаний нет. Это не означает, что резервуары пустые. Складской учёт не изменён.";
 };
 
 </script>
