@@ -665,7 +665,7 @@ db.auth.onAuthStateChange((event,session)=>{
   else if(session&&((event==="SIGNED_IN"&&invite)||(recoveryMode&&(event==="SIGNED_IN"||event==="INITIAL_SESSION"))))showPasswordSetup();
 });
 
-document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));$(b.dataset.page).classList.add("active");$("pageTitle").textContent=b.textContent});
+document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));$(b.dataset.page).classList.add("active");$("pageTitle").textContent=b.textContent;if(b.dataset.page==="scadaTanks")loadScadaTanks()});
 function table(headers,rows){return '<table><thead><tr>'+headers.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr>'+r.map(x=>'<td>'+x+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+headers.length+'" class="muted">Пока нет записей</td></tr>')+'</tbody></table>'}
 async function count(t,notClosed){let q=db.from(t).select("*",{count:"exact",head:true});if(notClosed)q=q.neq("status",notClosed);const {count}=await q;return count||0}
 async function refreshAll(){
