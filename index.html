@@ -1192,19 +1192,24 @@ window.loadScadaTanks=async()=>{
  const tankSignal=(tank,kind)=>list.find(t=>t.tank===tank&&t.kind===kind);
  const reading=c=>{
   if(!c)return null;
-  const key=c.io_device==="VariableDevice"?c.tag:c.tag+".raw";
-  const record=recent.get((c.plc_device||"plc1")+"|"+key);
-  if(!record || record.quality!=="good" || !Number.isFinite(Number(record.value_numeric)) || record.value_numeric===null)return null;
-  const age=now-Date.parse(record.measured_at);
-  if(!Number.isFinite(age)||age<0||age>120000)return null;
-  if(c.io_device==="VariableDevice"){
-   if(record.unit!==c.unit)return null;
-   return {value:Number(record.value_numeric),at:record.measured_at};
+  const device=(c.plc_device||"plc1");
+  const engineering=recent.get(device+"|"+(c.io_device==="VariableDevice"?c.tag:c.tag+".eng"));
+  const valid=r=>r&&r.quality==="good"&&r.value_numeric!==null&&
+    Number.isFinite(Number(r.value_numeric))&&
+    Number.isFinite(Date.parse(r.measured_at))&&
+    now-Date.parse(r.measured_at)>=0&&now-Date.parse(r.measured_at)<=120000;
+  // Authenticated OPC DA relay sends already scaled engineering units, not raw PLC words.
+  if(valid(engineering)&&engineering.unit===c.unit){
+    const value=Number(engineering.value_numeric);
+    if(c.io_device==="VariableDevice"||
+       (c.eng_min!==null&&c.eng_max!==null&&value>=Number(c.eng_min)-2&&value<=Number(c.eng_max)+2))
+      return {value,at:engineering.measured_at};
   }
-  if(!c.modbus_verified || record.unit!=="raw")return null;
-  const raw=Number(record.value_numeric);
+  const rawRecord=recent.get(device+"|"+c.tag+".raw");
+  if(c.io_device==="VariableDevice"||!c.modbus_verified||!valid(rawRecord)||rawRecord.unit!=="raw")return null;
+  const raw=Number(rawRecord.value_numeric);
   if(raw<Number(c.raw_min)||raw>Number(c.raw_max)||Number(c.raw_max)===Number(c.raw_min))return null;
-  return {value:Number(c.eng_min)+(raw-Number(c.raw_min))*(Number(c.eng_max)-Number(c.eng_min))/(Number(c.raw_max)-Number(c.raw_min)),at:record.measured_at};
+  return {value:Number(c.eng_min)+(raw-Number(c.raw_min))*(Number(c.eng_max)-Number(c.eng_min))/(Number(c.raw_max)-Number(c.raw_min)),at:rawRecord.measured_at};
  };
  const fmt=(r,unit,d=1)=>r?Number(r.value).toLocaleString("ru-RU",{maximumFractionDigits:d})+" "+unit:"Нет данных";
  let active=0,volumeSum=0,volumeCount=0;
